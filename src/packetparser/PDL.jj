@@ -1,0 +1,298 @@
+/** C-like grammer to specify incoming packets */
+
+PARSER_BEGIN(Parser)
+
+package packetparser;
+
+public class Parser extends PDL {}
+
+PARSER_END(Parser)
+
+SKIP : {
+ " "
+|  "\t"
+|  "\n"
+|  "\r"
+|  <"//" (~["\n","\r"])* ("\n" | "\r" | "\r\n")>
+|  <"/*" (~["*"])* "*" ("*" | ~["*","/"] (~["*"])* "*")* "/">
+}
+
+TOKEN : {
+ <INTEGER_LITERAL: <DECIMAL_LITERAL> (["l","L"])? | <HEX_LITERAL> (["l","L"])? | <OCTAL_LITERAL> (["l","L"])?>
+|  <#DECIMAL_LITERAL: ["1"-"9"] (["0"-"9"])*>
+|  <#HEX_LITERAL: "0" ["x","X"] (["0"-"9","a"-"f","A"-"F"])+>
+|  <#OCTAL_LITERAL: "0" (["0"-"7"])*>
+|  <FLOATING_POINT_LITERAL: (["0"-"9"])+ "." (["0"-"9"])* (<EXPONENT>)? (["f","F","d","D"])? | "." (["0"-"9"])+ (<EXPONENT>)? (["f","F","d","D"])? | (["0"-"9"])+ <EXPONENT> (["f","F","d","D"])? | (["0"-"9"])+ (<EXPONENT>)? ["f","F","d","D"]>
+|  <#EXPONENT: ["e","E"] (["+","-"])? (["0"-"9"])+>
+|  <CHARACTER_LITERAL: "\'" (~["\'","\\","\n","\r"] | "\\" (["n","t","b","r","f","\\","\'","\""] | ["0"-"7"] (["0"-"7"])? | ["0"-"3"] ["0"-"7"] ["0"-"7"])) "\'">
+|  <STRING_LITERAL: "\"" (~["\"","\\","\n","\r"] | "\\" (["n","t","b","r","f","\\","\'","\""] | ["0"-"7"] (["0"-"7"])? | ["0"-"3"] ["0"-"7"] ["0"-"7"]))* "\"">
+}
+
+TOKEN : {
+	<CONTINUE: "continue"> |
+	<VOLATILE: "volatile"> |
+	<REGISTER: "register"> |
+	<UNSIGNED: "unsigned"> |
+	<TYPEDEF: "typedef"> |
+	<DFLT: "default"> |
+	<DOUBLE: "double"> |
+	<SIZEOF: "sizeof"> |
+	<SWITCH: "switch"> |
+	<RETURN: "return"> |
+	<EXTERN: "extern"> |
+	<STRUCT: "struct"> |
+	<STATIC: "static"> |
+	<SIGNED: "signed"> |
+	<WHILE: "while"> |
+	<BREAK: "break"> |
+	<UNION: "union"> |
+	<CONST: "const"> |
+	<FLOAT: "float"> |
+	<SHORT: "short"> |
+	<ELSE: "else"> |
+	<CASE: "case"> |
+	<LONG: "long"> |
+	<ENUM: "enum"> |
+	<AUTO: "auto"> |
+	<VOID: "void"> |
+	<CHAR: "char"> |
+	<GOTO: "goto"> |
+	<FOR: "for"> |
+	<INT: "int"> |
+	<IF: "if"> |
+	<DO: "do">
+}
+
+TOKEN : {
+ <IDENTIFIER: <LETTER> (<LETTER> | <DIGIT>)*>
+|  <#LETTER: ["$","A"-"Z","_","a"-"z"]>
+|  <#DIGIT: ["0"-"9"]>
+}
+
+void TranslationUnit() : {}
+{
+	(Definition())+
+}
+
+void Definition() : {}
+{
+    TypedefDeclaration()  |
+    VariableDeclaration() |
+    Assignment()
+}
+
+void TypedefDeclaration() : { Token t = null; TypeSpecifier typeSpec = null;
+   PacketTemplate packetType = null; }
+{
+    <TYPEDEF> (  (typeSpec = TypeSpecifier()) (t = <IDENTIFIER>)) ";"
+    {
+    	    typeSpec.typeName = t.image;
+        if (parser.verbose) System.out.println("TypedefDeclaration of " + typeSpec.typeName);
+    	    parser.addType( typeSpec.typeName, typeSpec );
+    }
+}
+
+void VariableDeclaration() : {TypeSpecifier typeSpec; String name = null; String value = ""; }
+{
+    (typeSpec = TypeSpecifier() ) [ ( name = <IDENTIFIER>.image ) ]
+    [ "=" (value= <INTEGER_LITERAL>.image) ] ";"
+    {
+        if (name != null) {
+        		if (parser.verbose) System.out.println("VariableDeclaration: " + name + " = " + value);
+        		parser.addValue( name, value );
+        	}
+    }
+}
+
+
+
+PacketTemplate StructDeclaration() : {
+	Token t = null; PacketTemplate packet = new PacketTemplate(); boolean newDefinition = false; }
+{
+     StructOrUnionSpecifier() 
+     ( (  (t=<IDENTIFIER>) [ StructExpansion(packet) ] [ { newDefinition = true;  } StructBody(packet) ] )  | 
+       (  [ StructExpansion(packet) ]  { newDefinition = true;  } StructBody(packet)  )
+     )	
+	{
+		if (parser.verbose){
+			System.out.println("STRUCT new " + newDefinition );
+			if (t!=null)
+				System.out.println("NAME " + t.image );
+		}
+
+		if (newDefinition) {
+			if (t != null) {
+		       // struct defined, store it for later use
+			   packet.typeName = t.image;
+			   packet.size = packet.packetSize;
+			   parser.addStruct( packet.typeName, packet);
+		  	}
+	    } else {
+	    		packet = (PacketTemplate) parser.structs.get( t.image );
+	    		if ( packet == null ) 
+				throw new ParseException("referenced struct " + t.image + " not defined" );
+       } 
+	   return packet;
+	}
+}
+
+void StructBody(PacketTemplate packet) : {}
+{
+	"{"  (MemberDeclaration(packet))* "}" 
+}
+
+
+void StructExpansion( PacketTemplate packet) : {
+	Token parent; Token expansionField; Token guardField = null; Token guardValue = null; }
+{
+     ":"  (parent=<IDENTIFIER>) "." (expansionField=<IDENTIFIER>)
+     [ "(" (guardField = <IDENTIFIER>) "==" (guardValue = <IDENTIFIER>) ")" ]
+     {
+	   	   PacketTemplate parentPacket = (PacketTemplate) parser.types.get( parent.image);
+		   if (parentPacket == null) {
+				parentPacket = (PacketTemplate) parser.structs.get(parent.image);
+		   }		   
+		   if (parentPacket == null) {
+		   		throw new ParseException("Parent struct or type "+parent.image+" not defined");	
+		   }
+		   packet.parent = parentPacket;
+	       packet.expands = parentPacket.getAttribute(expansionField.image);
+	       if (guardField != null) {
+		       packet.guardField = parentPacket.getAttribute( guardField.image);
+		       if (packet.guardField == null)
+		       		throw new ParseException("Parent struct guard field "+guardField.image+" not exists");
+		       String guardValueString = guardValue.image;
+		       if (parser.values.containsKey(guardValue.image)) {
+		       	   guardValueString = (String) parser.values.get(guardValue.image);
+		       }
+	       	   try {	
+		           packet.guardValue = Integer.parseInt(guardValueString);
+		       } catch (Exception e) {
+		           e.printStackTrace();
+		       };
+	       }
+	       packet.fieldOffset = parentPacket.getAttribute(expansionField.image).offset;
+
+	       if (packet.expands == null)
+	       		throw new ParseException("Parent struct field "+packet.expands+" not exists");
+
+	       if (packet.packetSize == -1)
+	       		throw new ParseException("Parent struct field "+packet.expands+" not exists");
+     }
+}
+
+void MemberDeclaration (PacketTemplate packet) : { TypeSpecifier typeSpec; Token name;
+   Token integerLiteral = null; String field = null; boolean isArray = false; }
+{
+    (typeSpec = TypeSpecifier()) (name =<IDENTIFIER>) [ "["  { isArray = true; } [ ((field = Field()) | ( integerLiteral = <INTEGER_LITERAL>)) ] "]" ] ";"
+    {
+		int elementsInt = 1;
+		
+		if (field != null) {
+    		// check for already defined constant
+			String value = (String) parser.values.get( field );
+			if (value != null) {
+   				elementsInt = Integer.parseInt(value);
+			} else {
+				packet.fixedLength = false;
+				packet.lengthField = packet.getAttribute( field );
+				if ( packet.lengthField == null) {
+		       		throw new ParseException("Variable array size field '"+field+"' does not exist");
+				}	
+				packet.lengthPos = packet.lengthField.offset;
+				packet.lengthOffset = 0; 
+				elementsInt = PacketTemplate.variableSizedDirect;
+			}	
+		} else if (integerLiteral != null){
+    		elementsInt = Integer.parseInt(integerLiteral.image);
+   		} else if (isArray) {
+			elementsInt = PacketTemplate.variableSizedIndirect;
+   		}
+   		
+        packet.addAttribute( name.image, typeSpec, elementsInt);
+        if (parser.verbose) System.out.println("Adding " + name.image + " of type " + typeSpec.typeName);
+    }
+}
+
+
+Token TypedefName() : { Token t;}
+{
+	(t = <IDENTIFIER>)
+	{ return t; }
+}
+
+TypeSpecifier TypeSpecifier() : { String type = ""; Token t; TypeSpecifier typeSpec = new TypeSpecifier(); }
+{
+	[ <CONST> ] [ SignedSpecifier(typeSpec) ] (
+	 <VOID>  { /* ??? */ return typeSpec; } |
+	 <CHAR>  { typeSpec.size = 1 ; return typeSpec; } |
+	 <SHORT> { typeSpec.size = 2 ; return typeSpec; } |
+	 <INT>   { typeSpec.size = 2 ; return typeSpec; } |
+	 <LONG>  { typeSpec.size = 4 ; return typeSpec; } |
+	 <FLOAT> { typeSpec.size = 8 ; return typeSpec; } |
+	 <DOUBLE>{ typeSpec.size = 8 ; return typeSpec; } |
+	 LOOKAHEAD( { parser.isType(getToken(1).image) } )
+	 	 (t = TypedefName()) {return (TypeSpecifier) parser.types.get(t.image) ;} |
+	 (typeSpec = StructDeclaration()) { return typeSpec; }  
+	)
+}
+
+TypeSpecifier SignedSpecifier(TypeSpecifier typeSpec) : {}
+{
+   <UNSIGNED> { typeSpec.signed = false; return typeSpec; } |
+   <SIGNED>   { typeSpec.signed = true;  return typeSpec; }  
+}
+
+void Declarator() : {} 
+{
+    <IDENTIFIER> 
+}
+
+
+
+void StructOrUnionSpecifier() : {}
+{
+  	( <STRUCT> | <UNION> )
+}
+
+
+void Assignment() : { String name; String value; }
+{
+    (name = Field() ) "=" ( (value=<INTEGER_LITERAL>.image)  | (value = <STRING_LITERAL>.image) ) ";"
+    {
+        if (parser.verbose) System.out.println("Assignement: " + name + " = " + value);
+        parser.addValue( name, value);
+    }
+}
+
+String Field() : { String name = "" ; String sub = ""; }
+{
+    ( name = <IDENTIFIER>.image ) [ "." (sub = Field()) ]
+    {
+        if (sub != "")
+        		return name + "." + sub;
+        	else
+        		return name; 
+    }
+}
+
+String IntegerExpression() : { String value; String varName; }
+{
+	(value=<INTEGER_LITERAL>.image) 
+	{
+		return value;
+	}
+	
+	|
+	
+	(varName = <IDENTIFIER>.image){
+		// check for identifiers, too..
+	
+		value = (String) parser.values.get(varName);
+		if (value == null)
+			throw new ParseException("Variable "+varName+ " not set");
+		return value;
+	}
+}
+
+
