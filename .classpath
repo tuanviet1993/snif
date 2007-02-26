@@ -2,8 +2,8 @@
 <classpath>
 	<classpathentry kind="src" path="src"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
-	<classpathentry kind="lib" path="libs/jung-1.7.4.jar"/>
-	<classpathentry kind="lib" path="libs/commons-collections-3.2.jar"/>
-	<classpathentry kind="lib" path="libs/colt.jar"/>
+	<classpathentry kind="lib" path="lib/jung-1.7.6.jar"/>
+	<classpathentry kind="lib" path="lib/javacc-4.0.jar"/>
+	<classpathentry kind="lib" path="lib/colt-1.2.0.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>

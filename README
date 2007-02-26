@@ -1,0 +1,15 @@
+README for Sensor Network Inspection Framework
+
+COMPILE
+run "ant libs" to download the required libraries
+run "ant javacc" to create the packet defininition parser
+
+run "ant" to finally compile all source files
+
+for some strange reasons, the java compiler does not recognize the
+source="1.5" option and ant fails.
+
+you can use Eclipse to compile the sources instead
+
+
+

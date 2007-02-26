@@ -1,0 +1,50 @@
+<project name="dsnSympathy" default="compile">
+	<property name="src" location="src"/>
+	<property name="bin" location="bin"/>
+	<property name="lib" location="lib"/>
+	<property name="dist"  location="dist"/>
+
+	<target name="init">
+		<!-- Create the build directory structure used by compile -->
+		<mkdir dir="${bin}"/>
+		<!-- Create directory of 3rd party libraries -->
+		<mkdir dir="${lib}"/>
+	</target>
+
+	<target name="libs" depends="init">
+		<get src="https://javacc.dev.java.net/files/documents/17/26777/javacc-4.0.zip" dest="${lib}/javacc-4.0.zip"/>
+		<unzip src="${lib}/javacc-4.0.zip" dest="${lib}"/>
+		<copy file="${lib}/javacc-4.0/bin/lib/javacc.jar" tofile="${lib}/javacc-4.0.jar"/>
+
+		<get src="http://mirror.switch.ch/mirror/apache/dist/jakarta/commons/collections/binaries/commons-collections-3.2.zip" dest="${lib}/commons-collections-3.2.zip"/>
+		<unzip src="${lib}/commons-collections-3.2.zip" dest="${lib}"/>
+		<copy file="${lib}//commons-collections-3.2/commons-collections-3.2.jar" tofile="${lib}/commons-collections-3.2.jar"/>
+
+		<get src="http://dsd.lbl.gov/~hoschek/colt-download/releases/colt-1.2.0.zip" dest="${lib}/colt-1.2.0.zip"/>
+		<unzip src="${lib}/colt-1.2.0.zip" dest="${lib}"/>
+		<copy file="${lib}/colt/lib/colt.jar" tofile="${lib}/colt-1.2.0.jar"/>
+
+		<get src="http://mesh.dl.sourceforge.net/sourceforge/jung/jung-1.7.6.zip" dest="${lib}/jung-1.7.6.zip"/>
+		<mkdir dir="${lib}/jung-1.7.6"/>
+		<unzip src="${lib}/jung-1.7.6.zip" dest="${lib}/jung-1.7.6"/>
+		<copy file="${lib}/jung-1.7.6/lib/jung-1.7.6.jar" tofile="${lib}/jung-1.7.6.jar"/>
+	</target>
+
+	<target name="javacc">
+		<java classname="javacc" classpath="lib/javacc-4.0.jar" fork="true" >
+			<arg value="-output_directory=src/packetparser" />
+			<arg file="src/packetparser/PDL.jj" />
+		</java>
+	</target>
+
+	<target name="compile"
+		depends="init,javacc"
+		description="compile the source ">
+		<javac srcdir="${src}" destdir="${bin}" source="1.5" target="1.5" fork="true" 
+			classpath="${lib}/javacc-4.0.jar:${lib}/jung-1.7.6.jar:${lib}/colt-1.2.0.jar:${lib}/commons-collections-3.2.jar" />
+	</target>
+
+	<target name="run" depends="compile">
+	</target>
+
+</project>
