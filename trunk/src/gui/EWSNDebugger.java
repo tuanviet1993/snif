@@ -5,6 +5,7 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.text.NumberFormat;
 import java.util.HashMap;
+
 import model.NodeAddress;
 import packetparser.DecodedPacket;
 import packetparser.PDL;
@@ -15,7 +16,6 @@ import stream.AbstractPipe;
 import stream.AbstractSink;
 import stream.AbstractSource;
 import stream.Filter;
-import stream.GroupEvaluationFunction;
 import stream.Predicate;
 import stream.Scheduler;
 import stream.TimeTriggered;
@@ -29,7 +29,6 @@ import stream.tuple.DistinctInWindow;
 import stream.tuple.GroupingEvaluator;
 import stream.tuple.LogReader;
 import stream.tuple.Mapper;
-import stream.tuple.Max;
 import stream.tuple.NetworkPartitionDetection;
 import stream.tuple.PacketTuple;
 import stream.tuple.PacketTupleTracer;
@@ -37,10 +36,8 @@ import stream.tuple.Ratio;
 import stream.tuple.RouteAnalyzer;
 import stream.tuple.SeqNrResetDetector;
 import stream.tuple.TreeAttributePredicate;
-import stream.tuple.TreePredicate;
 import stream.tuple.Tuple;
 import stream.tuple.TupleChangePredicate;
-import stream.tuple.TupleGroupAggregator;
 import stream.tuple.TupleTimeWindowDistinctGroupAggregator;
 import stream.tuple.TupleTimeWindowGroupAggregator;
 import dsn.DSNConnector;
@@ -102,7 +99,7 @@ public class EWSNDebugger {
 	 * @param parser
 	 * @return
 	 */
-	private static Predicate<PacketTuple> createCRCFilter(final PDL parser) {
+	public static Predicate<PacketTuple> createCRCFilter(final PDL parser) {
 		// crc check: remove packets with wrong CRC
 		Predicate<PacketTuple> crcCheck = new Predicate<PacketTuple>() {
 			final PhyConfig phyConfig = parser.getSnifferConfig();
@@ -758,7 +755,7 @@ public class EWSNDebugger {
 	/**
 	 * @return
 	 */
-	private static AbstractSink<Tuple> createTotalBandwidthAggregator() {
+	public static AbstractSink<Tuple> createTotalBandwidthAggregator() {
 		AbstractSink<Tuple> totalDataAggregator = new AbstractSink<Tuple>() {
 			public void process(Tuple o, int srcID, long timestamp) {;
 				PacketTuple packetTuple = ((PacketTuple) o);

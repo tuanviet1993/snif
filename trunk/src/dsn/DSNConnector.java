@@ -15,8 +15,12 @@ import packetparser.PhyConfig;
 
 
 public class DSNConnector extends Thread implements DiscoveryListener {
-	private static final int SNIF_COD_MINOR = 184;
 
+	// COD detection not working properly on mac os x
+	// don't filter on COD right now
+	@SuppressWarnings("unused")
+	private static final int SNIF_COD_MINOR = 184;
+	@SuppressWarnings("unused")
 	private static final int SNIF_COD_MAJOR = 3;
 
 	private L2CAPConnection con;
