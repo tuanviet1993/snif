@@ -706,7 +706,7 @@ public class Parser extends PDL implements ParserConstants {
   }
 
   static public void ReInit(java.io.InputStream stream) {
-     ReInit(stream);
+     ReInit(stream, null);
   }
   static public void ReInit(java.io.InputStream stream, String encoding) {
     try { jj_input_stream.ReInit(stream, encoding, 1, 1); } catch(java.io.UnsupportedEncodingException e) { throw new RuntimeException(e); }
