@@ -45,41 +45,6 @@ public class DetectionAlgoTuple {
 
 	
 	/**
-	 * @param node
-	 * @param sourceID
-	 * @return 
-	 */
-	private static String getName(Object node) {
-		if ( node instanceof AbstractSink) {
-			return ((AbstractSink) node).name;
-		} else if ( node instanceof AbstractPipe ) {
-			return ((AbstractPipe) node).name;
-		} else if ( node instanceof AbstractSource ) {
-			return ((AbstractSource) node).name;
-		}
-		return null;
-	}
-
-	public static void dumpGraph( Object node, int sourceID) {
-		
-		String from = getName(node);
-		if (node instanceof Source) {
-			Sink sinks[] = ((AbstractPipe) node).getSinks();
-			int sinkIDs[] = ((AbstractPipe) node).getSinkIDs();
-			for (int i=0; sinks != null && i < sinks.length; i++) {
-				System.out.println("    \""+from + "\" -> \"" + getName(sinks[i] )+"\";");
-			}
-			for (int i=0; sinks != null && i < sinks.length; i++) {
-				if (!visited.contains(sinks[i])) {
-					visited.add(sinks[i]);
-					dumpGraph(  sinks[i], sinkIDs[i]);
-				}
-			}
-		}
-	}
-
-	
-	/**
 	 * Dump packets of path
 	 * 
 	 * @param args Path to folder containing logFilter logs
@@ -207,82 +172,82 @@ public class DetectionAlgoTuple {
 		
 		// filter packets with identical content reported by different DSN nodes within short time (5 ms)
 		DistinctInWindow distinctInWindow = new DistinctInWindow(5);
-		Filter<PacketTuple> dupFilter = new Filter<PacketTuple>(distinctInWindow, "dupFilter");
+		Filter<PacketTuple> dupFilter = new Filter<PacketTuple>(distinctInWindow);
 		merger.subscribe(dupFilter, id++);
 
 		// get linkBeacon tuple stream
 		Filter<Tuple> linkBeaconFilter = new Filter<Tuple>(
-				new AttributePredicate("TOS_Msg.type", parser.getValue( "MULTIHOP_LINKESTIMATORBEACON")), "linkBeaconFilter");
+				new AttributePredicate("TOS_Msg.type", parser.getValue( "MULTIHOP_LINKESTIMATORBEACON")));
 		dupFilter.subscribe( linkBeaconFilter, id++);
 			
 		// extract layer 2 source address from beacons
-		Mapper linkBeaconIDMapper = new Mapper( "linkBeaconIDMapper", "IDTuple", "LinkEstimatorBeacon.id", "nodeID");
+		Mapper linkBeaconIDMapper = new Mapper( "IDTuple", "LinkEstimatorBeacon.id", "nodeID");
 		linkBeaconFilter.subscribe( linkBeaconIDMapper, id++);
 		
 		// extract layer 2 source address and seqNr from beacons
-		Mapper seqNrMapper = new Mapper( "seqNrMapper", "SeqNrTuple", "LinkEstimatorBeacon.id", "nodeID", "LinkEstimatorBeacon.seqNr", "seqNr");
+		Mapper seqNrMapper = new Mapper( "SeqNrTuple", "LinkEstimatorBeacon.id", "nodeID", "LinkEstimatorBeacon.seqNr", "seqNr");
 		linkBeaconFilter.subscribe( seqNrMapper, id++);
 
 		// get overall bservation quality
-		TupleGroupAggregator totalObservationQuality = new TupleGroupAggregator( new Ratio ( "ObservationQuality", "seqNr"), "nodeID", "totalObservationQuality");
+		TupleGroupAggregator totalObservationQuality = new TupleGroupAggregator( new Ratio ( "ObservationQuality", "seqNr"), "nodeID");
 		seqNrMapper.subscribe( totalObservationQuality, id++ );
 
 		// check for seq nr reset on beacon seq nr
-		SeqNrResetDetector seqResetDetector = new SeqNrResetDetector("seqResetDetector",
-				"LinkEstimatorBeacon.id", "LinkEstimatorBeacon.seqNr", WORD_MAX_VALUE, 10 );
+		SeqNrResetDetector seqResetDetector = new SeqNrResetDetector("LinkEstimatorBeacon.id",
+				"LinkEstimatorBeacon.seqNr", WORD_MAX_VALUE, 10 );
 		linkBeaconFilter.subscribe(seqResetDetector, id++ );
 
 		// get linkAdvertisement tuple stream
 		Filter<Tuple> linkAdvertisementFilter = new Filter<Tuple>(
-				new AttributePredicate("TOS_Msg.type", parser.getValue("MULTIHOP_LINKESTIMATORADVERTISEMENT")), "linkAdvertisementFilter" ); 
+				new AttributePredicate("TOS_Msg.type", parser.getValue("MULTIHOP_LINKESTIMATORADVERTISEMENT")) ); 
 		dupFilter.subscribe( linkAdvertisementFilter, id++);
 				
 		// extract layer 2 source address from beacons
-		Mapper linkAdvertisementIDMapper = new Mapper( "linkAdvertisementIDMapper", "IDTuple", "LinkAdvertisement.id", "nodeID");
+		Mapper linkAdvertisementIDMapper = new Mapper( "IDTuple", "LinkAdvertisement.id", "nodeID");
 		linkAdvertisementFilter.subscribe( linkAdvertisementIDMapper, id++);
 		
 		// translate LinkAdvertisementBeacons into Neighbour sightings
 		ArrayExtractor linkAdvertisementExtractor = new ArrayExtractor( "LinkQuality",
-				"LinkAdvertisement.links.length", "LinkAdvertisement.links", "linkAdvertisementExtractor");
+				"LinkAdvertisement.links.length", "LinkAdvertisement.links");
 		linkAdvertisementFilter.subscribe( linkAdvertisementExtractor, id++);
 
 		// extract layer 2 source address from beacons
-		Mapper linkAdvertisementMapper = new Mapper( "linkAdvertisementMapper" , "NodeSeen", "LinkAdvertisement.id", "reportingNode", "id", "seenNode");
+		Mapper linkAdvertisementMapper = new Mapper( "NodeSeen" , "LinkAdvertisement.id", "reportingNode", "id", "seenNode");
 		linkAdvertisementExtractor.subscribe( linkAdvertisementMapper, id++);
 		
 		// get pathAdvertisementFilter tuple stream
 		Filter<Tuple> pathAdvertisementFilter = new Filter<Tuple>(
-		new AttributePredicate("TOS_Msg.type", parser.getValue("MULTIHOP_PATHADVERTISEMENT")), "pathAdvertisementFilter"); 
+		new AttributePredicate("TOS_Msg.type", parser.getValue("MULTIHOP_PATHADVERTISEMENT"))); 
 		dupFilter.subscribe( pathAdvertisementFilter, id++);
 		
 		// extract layer 2 source address from beacons
-		Mapper pathAdvertisementIDMapper = new Mapper( "pathAdvertisementIDMapper", "IDTuple", "PathAdvertisement.id", "nodeID");
+		Mapper pathAdvertisementIDMapper = new Mapper( "IDTuple", "PathAdvertisement.id", "nodeID");
 		pathAdvertisementFilter.subscribe( pathAdvertisementIDMapper, id++);
 
 		// extract path quality
 		ArrayExtractor pathAdvertisementExtractor = new ArrayExtractor( "PathQuality",
-				"PathAdvertisement.paths.length", "PathAdvertisement.paths","pathAdvertisementExtractor2");
+				"PathAdvertisement.paths.length", "PathAdvertisement.paths");
 		pathAdvertisementFilter.subscribe( pathAdvertisementExtractor, id++);
 
 		// extract src source address from traced multihop packets
-		Mapper pathAdvertisementMapper = new Mapper( "pathAdvertisementMapper" , "PathAnnouncement", "PathAdvertisement.id", "nodeID", "quality", "quality");
+		Mapper pathAdvertisementMapper = new Mapper( "PathAnnouncement" , "PathAdvertisement.id", "nodeID", "quality", "quality");
 		pathAdvertisementExtractor.subscribe( pathAdvertisementMapper, id++);
 		
 		// get multiHopPacket stream
 		Filter<Tuple> multiHopFilter = new Filter<Tuple>(
-				new AttributePredicate("TOS_Msg.type", parser.getValue("MULTIHOP_MULTIHOPPACKET")), "multiHopFilter" ); 
+				new AttributePredicate("TOS_Msg.type", parser.getValue("MULTIHOP_MULTIHOPPACKET")) ); 
 		dupFilter.subscribe( multiHopFilter, id++);
 		
 		// PacketTracer reports last node sending a packet before
-		PacketTupleTracer packetTracer = new PacketTupleTracer("packetTracer", "PacketTracerTuple", "TOS_Msg.addr", "MultiHopPacket.src", "MultiHopPacket.dst", "MultiHopPacket.seqno");
+		PacketTupleTracer packetTracer = new PacketTupleTracer("PacketTracerTuple", "TOS_Msg.addr", "MultiHopPacket.src", "MultiHopPacket.dst", "MultiHopPacket.seqno");
 		multiHopFilter.subscribe( packetTracer, id++);
 
 		// extract src source address from traced multihop packets
-		Mapper multihopIDMapper = new Mapper( "multihopIDMapper", "IDTuple", "l2src", "nodeID");
+		Mapper multihopIDMapper = new Mapper( "IDTuple", "l2src", "nodeID");
 		packetTracer.subscribe( multihopIDMapper, id++);
 
 		// get source address of all streams if available
-		Union<Tuple> packetIdStream = new Union<Tuple>("packetIdStream");
+		Union<Tuple> packetIdStream = new Union<Tuple>();
 		linkBeaconIDMapper.subscribe( packetIdStream, id++);
 		linkAdvertisementIDMapper.subscribe( packetIdStream, id++);
 		pathAdvertisementIDMapper.subscribe( packetIdStream, id++);
@@ -303,22 +268,22 @@ public class DetectionAlgoTuple {
 
 		// metric: number of neighbours reported node last epoch per node
 		TupleTimeWindowDistinctGroupAggregator seenByNeighbours =
-			new TupleTimeWindowDistinctGroupAggregator ( "seenByNeighbours", linkAdvPeriod * packetMultiply, new Counter("NeighbourReportsLastEpochTemp", "sightings"),
-					"seenNode", "reportingNode","seenNode") ;
+			new TupleTimeWindowDistinctGroupAggregator ( linkAdvPeriod * packetMultiply, new Counter("NeighbourReportsLastEpochTemp", "sightings"), "seenNode",
+					"reportingNode", "seenNode") ;
 		linkAdvertisementMapper.subscribe( seenByNeighbours, id++);
 
 		// use "seenNode" as "nodeID"
-		Mapper seenByNeighboursIDMapper = new Mapper( "seenByNeighboursIDMapper", "NeighbourReportsLastEpoch", "seenNode", "nodeID" , "sightings", "sightings" );
+		Mapper seenByNeighboursIDMapper = new Mapper( "NeighbourReportsLastEpoch", "seenNode", "nodeID", "sightings" , "sightings" );
 		seenByNeighbours.subscribe( seenByNeighboursIDMapper, id++);
 
 		// metric: number of neighbours reported node last epoch per node
 		TupleTimeWindowDistinctGroupAggregator neighboursSeenLastEpoch =
-			new TupleTimeWindowDistinctGroupAggregator ( "neighboursSeenLastEpoch", linkAdvPeriod * packetMultiply, new Counter("NeighbourSeenLastEpochTemp", "sightings"),
-					"reportingNode", "reportingNode","seenNode");
+			new TupleTimeWindowDistinctGroupAggregator ( linkAdvPeriod * packetMultiply, new Counter("NeighbourSeenLastEpochTemp", "sightings"), "reportingNode",
+					"reportingNode", "seenNode");
 		linkAdvertisementMapper.subscribe( neighboursSeenLastEpoch, id++);
 		
 		// use "reportingNode" as "nodeID"
-		Mapper neighboursSeenLastEpochIDMapper = new Mapper( "neighboursSeenLastEpochIDMapper", "NeighbourSeenLastEpoch", "reportingNode", "nodeID", "sightings", "sightings" );
+		Mapper neighboursSeenLastEpochIDMapper = new Mapper( "NeighbourSeenLastEpoch", "reportingNode", "nodeID", "sightings", "sightings" );
 		neighboursSeenLastEpoch.subscribe( neighboursSeenLastEpochIDMapper, id++);
 		
 		// metric: max path quality reported last epoch
@@ -327,12 +292,12 @@ public class DetectionAlgoTuple {
 		pathAdvertisementMapper.subscribe(maxPathQuality , id++);
 		
 		// Route analyzer: detects "GoodRoute"s, "RoutingLoop" and performs "LatencyMeasurement"
-		AbstractPipe<Tuple,Tuple> routeAnalyzer = new RouteAnalyzer(theSink,"routeAnalyzer");
+		AbstractPipe<Tuple,Tuple> routeAnalyzer = new RouteAnalyzer(theSink);
 		packetTracer.subscribe( routeAnalyzer, id++);
 
 		// get LatencyMeasurement measurements (?)
 		Filter<Tuple> goodRouteFilter = new Filter<Tuple>(
-				new AttributePredicate("TupleType",  "LatencyMeasurement" ),"goodRouteFilter"); 
+				new AttributePredicate("TupleType",  "LatencyMeasurement" )); 
 		routeAnalyzer.subscribe( goodRouteFilter, id++);
 		
 		// metric: nr of good route reports last epoch // TODO should use dataPeriod ??
@@ -342,7 +307,7 @@ public class DetectionAlgoTuple {
 
 		// get RoutingLoop detections
 		Filter<Tuple> routingLoopFilter = new Filter<Tuple>(
-				new AttributePredicate("TupleType",  "RoutingLoop" ),"routingLoopFilter"); 
+				new AttributePredicate("TupleType",  "RoutingLoop" )); 
 		routeAnalyzer.subscribe( routingLoopFilter, id++);
 
 		// metric: nr of routing loops last epoch
@@ -355,7 +320,7 @@ public class DetectionAlgoTuple {
 		seqNrMapper.subscribe( observationQuality, id++ );
 		
 		// get all metric streams
-		Union<Tuple> metricStream = new Union<Tuple>("metricStream");
+		Union<Tuple> metricStream = new Union<Tuple>();
 		packetsLastEpoch.subscribe( metricStream, id++);
 		seenByNeighboursIDMapper.subscribe( metricStream, id++);
 		neighboursSeenLastEpochIDMapper.subscribe( metricStream, id++);
@@ -366,7 +331,7 @@ public class DetectionAlgoTuple {
 		observationQuality.subscribe( metricStream, id++);
 
 		// get all event streams
-		Union<Tuple> eventStream = new Union<Tuple>("eventStream");
+		Union<Tuple> eventStream = new Union<Tuple>();
 		seqResetDetector.subscribe( eventStream, id++);
 		// TODO latencyObservator.subscribe( eventStream, id++ );
 		
@@ -457,7 +422,7 @@ public class DetectionAlgoTuple {
 //		goodRouteReports.subscribe( debugLogger, id++);
 
 		// get node state changes
-		Filter<Tuple> nodeStateChangeFilter = new Filter<Tuple>( new TupleChangePredicate("nodeID"), "nodeStateChangeFilter");
+		Filter<Tuple> nodeStateChangeFilter = new Filter<Tuple>( new TupleChangePredicate("nodeID"));
 		stateDetector.subscribe( nodeStateChangeFilter, id++);
 
 		// network partition detetction  TODO --

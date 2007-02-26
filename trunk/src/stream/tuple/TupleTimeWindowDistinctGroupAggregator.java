@@ -38,13 +38,12 @@ TimeWindowDistinctGroupAggregator<Tuple, Object, Object, Tuple> {
 	};
 
 	public TupleTimeWindowDistinctGroupAggregator(
-			String name,
 			int timewindow,
 			AggregationFunction<Tuple> aggregator,
 			String groupField,
 			String... distinctFields ){
 		
-		super(name);
+		super();
 		this.timewindow = timewindow;
 		this.distincter = fieldsDistincter;
 		this.grouper = fieldGrouper;
@@ -62,9 +61,8 @@ TimeWindowDistinctGroupAggregator<Tuple, Object, Object, Tuple> {
 			Function<Tuple, ? extends Object> distincter,
 			Function <Tuple, ?> grouper,
 			String groupField,
-			AggregationFunction<Tuple> aggregator,
-			String name) {
-		super(name);
+			AggregationFunction<Tuple> aggregator) {
+		super();
 		this.timewindow = timewindow;
 		this.distincter = distincter;
 		this.grouper    = grouper;

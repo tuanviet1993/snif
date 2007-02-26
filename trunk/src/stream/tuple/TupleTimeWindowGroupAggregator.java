@@ -18,7 +18,6 @@ public class TupleTimeWindowGroupAggregator extends TimeWindowGroupAggregator<Tu
 
 	
 	public TupleTimeWindowGroupAggregator(int timewindow, Function <Tuple, ?> grouper, String groupField, AggregationFunction<Tuple> aggregator, String name) {
-		super(name);
 		this.timewindow = timewindow;
 		this.grouper    = grouper;
 		this.aggregator = aggregator;
@@ -27,7 +26,6 @@ public class TupleTimeWindowGroupAggregator extends TimeWindowGroupAggregator<Tu
 	}
 
 	public TupleTimeWindowGroupAggregator(int timewindow, String groupField, AggregationFunction<Tuple> aggregator, String name) {
-		super(name);
 		this.timewindow = timewindow;
 		this.groupField = groupField;
 		this.groupFieldID = Tuple.getAttributeId( groupField);

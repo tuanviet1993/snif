@@ -34,11 +34,10 @@ public class GroupingEvaluator extends
 	};
 
 	public GroupingEvaluator(
-			String name,
 			GroupTupleEvaluationFunction<Tuple> evaluator,
-			String groupField, String... distinctFields){
-		
-		super(name);
+			String groupField,
+			String... distinctFields){
+		super();
 		this.distincter = fieldsDistincter;
 		this.grouper = fieldGrouper;
 		this.evaluator = evaluator;
@@ -50,12 +49,11 @@ public class GroupingEvaluator extends
 		}
 	}
 	
-	public GroupingEvaluator(String name,
-			Function<Tuple,?> distincter,
+	public GroupingEvaluator(Function<Tuple,?> distincter,
 			Function<Tuple,?> grouper,
 			String groupField,
 			GroupTupleEvaluationFunction<Tuple> evaluator) {
-		super(name);
+		super();
 		this.distincter = distincter;
 		this.grouper    = grouper;
 		this.evaluator = evaluator;
@@ -63,11 +61,10 @@ public class GroupingEvaluator extends
 		this.groupFieldID = Tuple.getAttributeId( groupField);
 	}
 	
-	public GroupingEvaluator( String name,
-			GroupTupleEvaluationFunction<Tuple> evaluator,
+	public GroupingEvaluator( GroupTupleEvaluationFunction<Tuple> evaluator,
 			Function<Tuple,? extends Object> distincter,
 			String groupField ) {
-		super(name);
+		super();
 		this.distincter = distincter;
 		this.grouper    = fieldGrouper;;
 		this.evaluator = evaluator;
@@ -77,7 +74,6 @@ public class GroupingEvaluator extends
 
 	public static GroupingEvaluator createBinaryTreeEvaluator(final BinaryDecisionTree theTree, final String groupField, final String name) {
 		return new GroupingEvaluator (
-				name,
 				new GroupTupleEvaluationFunction<Tuple>() {
 					int nodeId = Tuple.getAttributeId(groupField);
 					BinaryDecisionTree tree = theTree;

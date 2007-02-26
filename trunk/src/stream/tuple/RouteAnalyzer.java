@@ -50,8 +50,7 @@ public final class RouteAnalyzer extends AbstractPipe<Tuple, Tuple> {
 	// store for all nodes timestamp of last information received
 	HashMap<Object, HashMap<Object, Route>> lastInformationReceived = new HashMap<Object, HashMap<Object, Route>>();
 
-	public RouteAnalyzer(NodeAddress sink, String name) {
-		this.name = name;
+	public RouteAnalyzer(NodeAddress sink) {
 		if (!tupleRegisterd) {
 			Tuple.registerTupleType("RoutingLoop", "nodeID", "destID");
 			Tuple.registerTupleType("LatencyMeasurement", "nodeID", "time",	"hops");
@@ -174,7 +173,7 @@ public final class RouteAnalyzer extends AbstractPipe<Tuple, Tuple> {
 	public static void main(String[] args) throws Exception {
 		Tuple.registerTupleType("PacketTracerTuple", "l2src", "l2dst", "l3src",
 				"l3dst", "l3seqNr");
-		RouteAnalyzer analyzer = new RouteAnalyzer(new NodeAddress(2),"RouteAnalyzer");
+		RouteAnalyzer analyzer = new RouteAnalyzer(new NodeAddress(2));
 		dump = true;
 
 		analyzer.send(1, 2); 
