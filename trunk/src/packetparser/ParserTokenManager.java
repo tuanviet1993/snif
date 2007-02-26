@@ -975,14 +975,12 @@ static protected SimpleCharStream input_stream;
 static private final int[] jjrounds = new int[60];
 static private final int[] jjstateSet = new int[120];
 static protected char curChar;
-public ParserTokenManager(SimpleCharStream stream)
-{
+public ParserTokenManager(SimpleCharStream stream){
    if (input_stream != null)
       throw new TokenMgrError("ERROR: Second call to constructor of static lexer. You must use ReInit() to initialize the static variables.", TokenMgrError.STATIC_LEXER_ERROR);
    input_stream = stream;
 }
-public ParserTokenManager(SimpleCharStream stream, int lexState)
-{
+public ParserTokenManager(SimpleCharStream stream, int lexState){
    this(stream);
    SwitchTo(lexState);
 }
