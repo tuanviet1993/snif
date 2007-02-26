@@ -38,14 +38,11 @@ public class BTnodeL2CAPTest extends Thread implements DiscoveryListener {
 	
 	public void deviceDiscovered(RemoteDevice btDevice, DeviceClass cod) {
 		String address = btDevice.getBluetoothAddress();
-		DeviceClass cod2 = btDevice.getDeviceClass();
 		
 		if (address.startsWith(btPrefix)  ) {
 			System.out.println("BTNode " + address +" , Service: "+cod.getServiceClasses()+", Major: "
 			+ cod.getMajorDeviceClass() + ", Minor: " + cod.getMinorDeviceClass());
 			snifGateway = address;
-			System.out.println("BTNode-" + address +" , Service: "+cod2.getServiceClasses()+", Major: "
-					+ cod2.getMajorDeviceClass() + ", Minor: " + cod2.getMinorDeviceClass());
 		} else {
 			System.out.println("Other Device " + address +" , Service: "+cod.getServiceClasses()+", Major: "
 			+ cod.getMajorDeviceClass() + ", Minor: " + cod.getMinorDeviceClass());
