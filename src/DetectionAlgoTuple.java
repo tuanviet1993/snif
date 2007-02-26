@@ -148,6 +148,7 @@ public class DetectionAlgoTuple {
 		final int beaconPeriod  = 10 * 1000;
 		final int linkAdvPeriod = 80 * 1000;
 		final int pathAdvPeriod = 80 * 1000;
+		@SuppressWarnings("unused")
 		final int dataPeriod    = 30 * 1000;
 		
 		
