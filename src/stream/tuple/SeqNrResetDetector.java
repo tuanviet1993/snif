@@ -29,11 +29,10 @@ public class SeqNrResetDetector extends AbstractPipe<Tuple, Tuple> {
 		nodes.put(nodeID, currentSeqNr);
 	}
 	
-	public SeqNrResetDetector(String name, String idField, String seqNrField, int maxSeqNq, int expectOverrun) {
+	public SeqNrResetDetector(String idField, String seqNrField, int maxSeqNq, int expectOverrun) {
 		idFieldID = Tuple.getAttributeId(idField);
 		seqNrFieldID = Tuple.getAttributeId(seqNrField);
 		this.maxSeqNq = maxSeqNq;
 		this.expectOverrun = maxSeqNq - expectOverrun;
-		this.name = name;
 	}
 }

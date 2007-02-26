@@ -43,13 +43,12 @@ public class ArrayExtractor extends AbstractPipe<Tuple, Tuple> {
 			transfer( newTuple, timestamp );
 		}
 	}
-	public ArrayExtractor(String newType, String arraySize, String arrayField, String name) {
+	public ArrayExtractor(String newType, String arraySize, String arrayField) {
 		this.newType = Tuple.getTupleTypeID(newType);
 		arrayFieldID = Tuple.getAttributeId( arrayField );
 		tupleTypeFieldID = Tuple.getAttributeId( "TupleType");
 		this.arrayField = arrayField;
 		sizeField = arraySize;
 		prototype = Tuple.createTuple(this.newType).getPrototype(); 
-		this.name = name;
 	}
 }

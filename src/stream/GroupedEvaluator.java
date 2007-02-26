@@ -32,15 +32,14 @@ public class GroupedEvaluator<I, J, K, O> extends AbstractPipe<I,O> {
 	 * @param distincter
 	 * @param evaluator
 	 */
-	public GroupedEvaluator(Function<I, ? extends K> grouper, Function<I, ? extends J> distincter, GroupEvaluationFunction<I,J,K,O> evaluator
-			, String name) {
+	public GroupedEvaluator(Function<I, ? extends K> grouper,
+			Function<I, ? extends J> distincter, GroupEvaluationFunction<I,J,K,O> evaluator
+		) {
 		this.distincter = distincter;
 		this.evaluator = evaluator;
 		this.grouper = grouper;
-		this.name = name;
 	}
 
-	protected GroupedEvaluator(String name) {
-		this.name = name;
+	protected GroupedEvaluator() {
 	}
 }

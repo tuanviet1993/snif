@@ -12,9 +12,8 @@ public class Filter<I> extends AbstractPipe<I,I> {
 	
 	private Predicate<? super I> predicate;
 
-	public Filter (Predicate<I> predicate, String name) {
+	public Filter (Predicate<I> predicate) {
 		this.predicate = predicate;
-		this.name = name;
 	}
 	
 	public void process(I o, int srcID, long timestamp) {

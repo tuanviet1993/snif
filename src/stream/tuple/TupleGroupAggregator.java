@@ -24,7 +24,7 @@ public class TupleGroupAggregator extends AbstractPipe<Tuple, Tuple>{
 	}
 
 	public void dump() {
-		System.out.println("ToupleGroupAggregator '"+name+"'");
+		System.out.println("ToupleGroupAggregator");
 		for (Tuple tuple: aggregates.values()) {
 			System.out.println( tuple.toString() );
 		}
@@ -50,8 +50,7 @@ public class TupleGroupAggregator extends AbstractPipe<Tuple, Tuple>{
 	 * @param groupField
 	 * @param operatorName TODO
 	 */
-	public TupleGroupAggregator(AggregationFunction<Tuple> aggregator, String groupField, String name) {
-		this.name = name;
+	public TupleGroupAggregator(AggregationFunction<Tuple> aggregator, String groupField) {
 		this.aggregator = aggregator;
 		this.groupField = groupField;
 		groupFieldID = Tuple.getAttributeId( groupField);

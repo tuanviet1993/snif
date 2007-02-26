@@ -69,18 +69,15 @@ public class TimeWindowDistinctGroupAggregator<I, J, K, O> extends AbstractPipe<
 			int timewindow,
 			Function<I, ? extends J> distincter,
 			Function<I, ? extends K> grouper,
-			GroupAggregationFunction<I,K,O> aggregator,
-			String name)
+			GroupAggregationFunction<I,K,O> aggregator)
 	{
 		this.timewindow = timewindow;
 		this.distincter = distincter;
 		this.grouper    = grouper;
 		this.aggregator = aggregator;
-		this.name       = name;
 	}
 	
-	protected TimeWindowDistinctGroupAggregator(String name) {
-		this.name = name;
+	protected TimeWindowDistinctGroupAggregator() {
 	}
 
 	public static void main(String args[]) {

@@ -20,9 +20,8 @@ public class Mapper extends AbstractPipe<Tuple, Tuple> {
 		transfer( newTuple, timestamp );
 
 	}
-	public Mapper(String name, String newType, String... mapping) {
+	public Mapper(String newType, String... mapping) {
 		this.newType = Tuple.getTupleTypeID(newType);
-		this.name = name;
 		 nrMappings = mapping.length / 2;
 		from = new int[nrMappings];
 		to =   new int[nrMappings];

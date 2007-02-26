@@ -2,7 +2,7 @@ package stream;
 
 public abstract class AbstractPipe<I,O> implements Pipe<I,O> {
 
-	public String name ="NameNotSetFor_"+this.getClass().getName();
+	// public String name ="NameNotSetFor_"+this.getClass().getName();
 	
 	/** 
 	 * Subscribed sinks. The IDs these sinks got

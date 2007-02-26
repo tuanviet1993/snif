@@ -26,8 +26,7 @@ public class PacketTupleTracer extends AbstractPipe<Tuple, Tuple> {
 	 * @param attrL3dst
 	 * @param attrL3seqNr
 	 */
-	public PacketTupleTracer(String name, final String tupleName, final String attrL2dst, final String attrL3src, final String attrL3dst, final String attrL3seqNr) {;
-		this.name = name;
+	public PacketTupleTracer(final String tupleName, final String attrL2dst, final String attrL3src, final String attrL3dst, final String attrL3seqNr) {;
 		this.attrL2dst = attrL2dst;
 		this.attrL3src = attrL3src;
 		this.attrL3dst = attrL3dst;

@@ -45,14 +45,12 @@ public class TimeWindowGroupAggregator<I, K, O> extends AbstractPipe<I, O> imple
 	}
 
 	public TimeWindowGroupAggregator ( int timewindow, Function<I, ? extends K> grouper,
-			GroupAggregationFunction<I,K,O> aggregator, String name){
+			GroupAggregationFunction<I,K,O> aggregator){
 		this.timewindow = timewindow;
 		this.grouper    = grouper;
 		this.aggregator = aggregator;
-		this.name = name;
 	}
 
-	public TimeWindowGroupAggregator(String name) {
-		this.name = name;
+	protected TimeWindowGroupAggregator() {
 	}
 }

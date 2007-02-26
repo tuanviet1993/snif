@@ -178,34 +178,34 @@ public class EWSN {
 
 			// filter packets with identical content reported by different DSN nodes within short time (20 ms)
 			DistinctInWindow distinctInWindow = new DistinctInWindow(1000);
-			Filter<PacketTuple> dupFilter = new Filter<PacketTuple>(distinctInWindow, "dupFilter");
+			Filter<PacketTuple> dupFilter = new Filter<PacketTuple>(distinctInWindow);
 
 			// extrac layer2 source
-			Mapper packetIdStream = new Mapper( "idMapper", "IDTuple", "bmac_msg_st.source", "nodeID");
+			Mapper packetIdStream = new Mapper( "IDTuple", "bmac_msg_st.source", "nodeID");
 			dupFilter.subscribe( packetIdStream, 0);
 
 			// get linkBeacon tuple stream
 			Filter<Tuple> linkBeaconFilter = new Filter<Tuple>(
-					new AttributePredicate("ccc_packet_st.type", parser.getValue( "BEACON_TYPE")), "linkBeaconFilter");
+					new AttributePredicate("ccc_packet_st.type", parser.getValue( "BEACON_TYPE")));
 			dupFilter.subscribe( linkBeaconFilter, 0);
 
 			// extract layer 2 source address and seqNr from beacons
-			Mapper seqNrMapper = new Mapper( "seqNrMapper", "SeqNrTuple", "beacon_packet.node_id", "nodeID", "beacon_packet.seq_nr", "seqNr");
+			Mapper seqNrMapper = new Mapper( "SeqNrTuple", "beacon_packet.node_id", "nodeID", "beacon_packet.seq_nr", "seqNr");
 			linkBeaconFilter.subscribe( seqNrMapper, 0);
 
 			// check for seq nr reset on beacon seq nr
-			SeqNrResetDetector seqResetDetector = new SeqNrResetDetector("seqResetDetector",
-					"nodeID", "seqNr", WORD_MAX_VALUE, 10 );
+			SeqNrResetDetector seqResetDetector = new SeqNrResetDetector("nodeID",
+					"seqNr", WORD_MAX_VALUE, 10 );
 			seqNrMapper.subscribe(seqResetDetector, 0 );
 
 			// get linkAdvertisement tuple stream
 			Filter<Tuple> linkAdvertisementFilter = new Filter<Tuple>(
-					new AttributePredicate("ccc_packet_st.type", parser.getValue("ADVERT_TYPE")), "linkAdvertisementFilter" ); 
+					new AttributePredicate("ccc_packet_st.type", parser.getValue("ADVERT_TYPE")) ); 
 			dupFilter.subscribe( linkAdvertisementFilter, 0);
 
 			// translate LinkAdvertisementBeacons into Neighbour sightings
 			ArrayExtractor linkAdvertisementExtractor = new ArrayExtractor( "LinkQuality",
-					"advert_packet.neighbours.length", "advert_packet.neighbours", "linkAdvertisementExtractor");
+					"advert_packet.neighbours.length", "advert_packet.neighbours");
 			linkAdvertisementFilter.subscribe( linkAdvertisementExtractor, 0);
 
 			// ignore empty entries
@@ -214,35 +214,35 @@ public class EWSN {
 						public boolean invoke(Tuple o, long timestamp) {
 							return o.getIntAttribute("node_id") != 0;
 						}
-					}, "neighbourTableFilter");
+					});
 			linkAdvertisementExtractor.subscribe( neighbourTableFilter,0) ;
 			
 			// map fields for neighbour count operators
-			Mapper linkAdvertisementMapper = new Mapper( "linkAdvertisementMapper" , "NodeSeen", "advert_packet.node_id", "reportingNode", "node_id", "seenNode");
+			Mapper linkAdvertisementMapper = new Mapper( "NodeSeen" , "advert_packet.node_id", "reportingNode", "node_id", "seenNode");
 			neighbourTableFilter.subscribe( linkAdvertisementMapper, 0);
 
 			// get pathAdvertisementFilter tuple stream
 			Filter<Tuple> pathAdvertisementFilter = new Filter<Tuple>(
-					new AttributePredicate("ccc_packet_st.type", parser.getValue("DISTANCE_TYPE")), "pathAdvertisementFilter"); 
+					new AttributePredicate("ccc_packet_st.type", parser.getValue("DISTANCE_TYPE"))); 
 			dupFilter.subscribe( pathAdvertisementFilter, 0);
 
 			// extract path quality
-			Mapper pathAdvertisementMapper = new Mapper( "pathAdvertisementMapper" , "PathAnnouncement", "distance_packet.node_id", "nodeID", "distance_packet.distance", "quality", "distance_packet.round_nr", "round");
+			Mapper pathAdvertisementMapper = new Mapper( "PathAnnouncement" , "distance_packet.node_id", "nodeID", "distance_packet.distance", "quality", "distance_packet.round_nr", "round");
 			pathAdvertisementFilter.subscribe( pathAdvertisementMapper, 0);
 
 			// get multiHopPacket stream
 			Filter<Tuple> multiHopFilter = new Filter<Tuple>(
-					new AttributePredicate("ccc_packet_st.type", parser.getValue("DATA_TYPE")), "multiHopFilter" ); 
+					new AttributePredicate("ccc_packet_st.type", parser.getValue("DATA_TYPE")) ); 
 			dupFilter.subscribe( multiHopFilter, 0);
 
 			AbstractPipe<Tuple, Tuple> packetTracer;
 			if (usePacketTracer) {
 				// get Tracer data directly from packet
 				// PacketTracer reports last node sending a packet before // HACK - l3src used as l3dst!
-				packetTracer = new PacketTupleTracer("packetTracer", "PacketTracerTuple", "bmac_msg_st.destination", "data_packet.node_id", "data_packet.node_id", "data_packet.seq_nr");
+				packetTracer = new PacketTupleTracer("PacketTracerTuple", "bmac_msg_st.destination", "data_packet.node_id", "data_packet.node_id", "data_packet.seq_nr");
 				multiHopFilter.subscribe( packetTracer, 0);
 			} else {
-				packetTracer = new Mapper ("packetTupleMapper", "PacketTracerTuple", "bmac_msg_st.source", "l2src", "bmac_msg_st.destination", "l2dst", "data_packet.node_id", "l3src");
+				packetTracer = new Mapper ("PacketTracerTuple", "bmac_msg_st.source", "l2src", "bmac_msg_st.destination", "l2dst", "data_packet.node_id", "l3src");
 				multiHopFilter.subscribe(packetTracer, 0);
 			}
 			
@@ -258,31 +258,31 @@ public class EWSN {
 
 			// metric: number of neighbours reported node last 2 epochs per node
 			TupleTimeWindowDistinctGroupAggregator seenByNeighbours =
-				new TupleTimeWindowDistinctGroupAggregator ( "seenByNeighbours", 2 * epoch, new Counter("NeighbourReportsLastEpochTemp", "sightings"),
-						"seenNode", "reportingNode","seenNode") ;
+				new TupleTimeWindowDistinctGroupAggregator ( 2 * epoch, new Counter("NeighbourReportsLastEpochTemp", "sightings"), "seenNode",
+						"reportingNode", "seenNode") ;
 			linkAdvertisementMapper.subscribe( seenByNeighbours, 0);
 
 			// use "seenNode" as "nodeID"
-			Mapper seenByNeighboursIDMapper = new Mapper( "seenByNeighboursIDMapper", "NeighbourReportsLastEpoch", "seenNode", "nodeID" , "sightings", "sightings" );
+			Mapper seenByNeighboursIDMapper = new Mapper( "NeighbourReportsLastEpoch", "seenNode", "nodeID", "sightings" , "sightings" );
 			seenByNeighbours.subscribe( seenByNeighboursIDMapper, 0);
 
 			// metric: number of neighbours seen by node node last 2 epochs
 			TupleTimeWindowDistinctGroupAggregator neighboursSeenLastEpoch =
-				new TupleTimeWindowDistinctGroupAggregator ( "neighboursSeenLastEpoch", 2 * epoch, new Counter("NeighbourSeenLastEpochTemp", "sightings"),
-						"reportingNode", "reportingNode","seenNode");
+				new TupleTimeWindowDistinctGroupAggregator ( 2 * epoch, new Counter("NeighbourSeenLastEpochTemp", "sightings"), "reportingNode",
+						"reportingNode", "seenNode");
 			linkAdvertisementMapper.subscribe( neighboursSeenLastEpoch, 0);
 
 			// use "reportingNode" as "nodeID"
-			Mapper neighboursSeenLastEpochIDMapper = new Mapper( "neighboursSeenLastEpochIDMapper", "NeighbourSeenLastEpoch", "reportingNode", "nodeID", "sightings", "sightings" );
+			Mapper neighboursSeenLastEpochIDMapper = new Mapper( "NeighbourSeenLastEpoch", "reportingNode", "nodeID", "sightings", "sightings" );
 			neighboursSeenLastEpoch.subscribe( neighboursSeenLastEpochIDMapper, 0);
 
 			// Route analyzer: detects "GoodRoute"s, "RoutingLoop" and performs "LatencyMeasurement"
-			AbstractPipe<Tuple,Tuple> routeAnalyzer = new RouteAnalyzer(theSink,"routeAnalyzer");
+			AbstractPipe<Tuple,Tuple> routeAnalyzer = new RouteAnalyzer(theSink);
 			packetTracer.subscribe( routeAnalyzer, 0);
 
 			// get LatencyMeasurement measurements (?)
 			Filter<Tuple> goodRouteFilter = new Filter<Tuple>(
-					new AttributePredicate("TupleType",  "LatencyMeasurement" ),"goodRouteFilter"); 
+					new AttributePredicate("TupleType",  "LatencyMeasurement" )); 
 			routeAnalyzer.subscribe( goodRouteFilter, 0);
 
 			// metric: nr of good route reports last 2 epochs
@@ -292,7 +292,7 @@ public class EWSN {
 
 			// get RoutingLoop detections
 			Filter<Tuple> routingLoopFilter = new Filter<Tuple>(
-					new AttributePredicate("TupleType",  "RoutingLoop" ),"routingLoopFilter"); 
+					new AttributePredicate("TupleType",  "RoutingLoop" )); 
 			routeAnalyzer.subscribe( routingLoopFilter, 0);
 
 			// metric: nr of routing loops last epochs
@@ -302,7 +302,7 @@ public class EWSN {
 
 			// get observation quality last 2 epochs
 			TupleTimeWindowDistinctGroupAggregator observationQuality = new TupleTimeWindowDistinctGroupAggregator
-			( "observationQuatlity", epoch, new Ratio ( "ObservationQuality", "seqNr"), "nodeID", "nodeID","seqNr") ;
+			( epoch, new Ratio ( "ObservationQuality", "seqNr"), "nodeID", "nodeID", "seqNr") ;
 			seqNrMapper.subscribe( observationQuality, 0 );
 			
 			// reboots last epoch
@@ -311,7 +311,7 @@ public class EWSN {
 			seqResetDetector.subscribe(rebootsLastEpoch , 0);
 			
 			// get all metric streams
-			Union<Tuple> metricStream = new Union<Tuple>("metricStream");
+			Union<Tuple> metricStream = new Union<Tuple>();
 			packetsLastEpoch.subscribe( metricStream, 0);
 			seenByNeighboursIDMapper.subscribe( metricStream, 0);
 			neighboursSeenLastEpochIDMapper.subscribe( metricStream, 0);
@@ -323,7 +323,7 @@ public class EWSN {
 			rebootsLastEpoch.subscribe(metricStream, 0);
 			
 			// get all event streams
-			Union<Tuple> eventStream = new Union<Tuple>("eventStream");
+			Union<Tuple> eventStream = new Union<Tuple>();
 			seqResetDetector.subscribe( eventStream, 0);
 			// TODO latencyObservator.subscribe( eventStream, 0 );
 
@@ -440,7 +440,7 @@ public class EWSN {
 			metricStream.subscribe( stateDetector , 0);
 
 			// get node state changes
-			Filter<Tuple> nodeStateChangeFilter = new Filter<Tuple>( new TupleChangePredicate("nodeID"), "nodeStateChangeFilter");
+			Filter<Tuple> nodeStateChangeFilter = new Filter<Tuple>( new TupleChangePredicate("nodeID"));
 			stateDetector.subscribe( nodeStateChangeFilter, 0);
 
 			// network partition detetction
