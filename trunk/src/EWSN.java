@@ -1,4 +1,7 @@
-package gui;
+
+
+import gui.SNIFController;
+import gui.View;
 
 import java.awt.Color;
 import java.io.FileWriter;
@@ -54,17 +57,12 @@ import dsn.DSNConnector;
  *
  */
 
-public class EWSNDebugger {
+public class EWSN extends SNIFController {
 	
-	public static String PACKET_INPUT = "";
-
+	
 	private static final String PACKETDEFINITION = "packetdefinitions/ewsn07.h";
 
-	public static boolean useDSN = false;
-	
 	public static boolean usePacketTracer = false;
-	
-	public static boolean useLog = !useDSN;
 
 	private static boolean runDebugger = true; // useLog;
 
@@ -124,14 +122,12 @@ public class EWSNDebugger {
 	}
 
 	// used to signal run queue
-	static Object start;
-
 	private static FileWriter dsnLogWriter;	
 
 	public void setup() {
 		// create view
 		// create graph
-		view = new View();
+		view = new View(this);
 		view.establish();
 		view.setVisible(true);
 		
@@ -148,7 +144,7 @@ public class EWSNDebugger {
 	// @SuppressWarnings("unchecked")
 	public static void main(String[] args) throws Exception {
 
-		EWSNDebugger debugger = new EWSNDebugger();
+		EWSN debugger = new EWSN();
 		debugger.setup();
 
 		// epoch.. timeout
@@ -326,10 +322,12 @@ public class EWSNDebugger {
 
 			BinaryDecisionTree noPacketReceivedTest = new BinaryDecisionTree( new TreeAttributePredicate(
 					"PacketsLastEpoch", "packets", TreeAttributePredicate.Comparator.equal, 0));
+			BinaryDecisionTree noPacketReceivedTest2 = new BinaryDecisionTree( new TreeAttributePredicate(
+					"PacketsLastEpoch", "packets", TreeAttributePredicate.Comparator.equal, 0));
 			BinaryDecisionTree coveredTest = new BinaryDecisionTree( new TreeAttributePredicate(
-					"ObservationQuality", "ratio", TreeAttributePredicate.Comparator2.greater, 0.6f));
-			BinaryDecisionTree noWitnessTest = new BinaryDecisionTree( new TreeAttributePredicate(
-					"NeighbourReportsLastEpoch", "sightings", TreeAttributePredicate.Comparator.equal, 0));
+					"ObservationQuality", "ratio", TreeAttributePredicate.Comparator2.greater, 0.7f));
+			// BinaryDecisionTree noWitnessTest = new BinaryDecisionTree( new TreeAttributePredicate(
+			//		"NeighbourReportsLastEpoch", "sightings", TreeAttributePredicate.Comparator.equal, 0));
 			BinaryDecisionTree noNeighboursTest = new BinaryDecisionTree( new TreeAttributePredicate(
 					"NeighbourSeenLastEpoch", "sightings", TreeAttributePredicate.Comparator.equal, 0));
 			BinaryDecisionTree networkPartitionTestB = new BinaryDecisionTree( new TreeAttributePredicate(
@@ -341,47 +339,20 @@ public class EWSNDebugger {
 			BinaryDecisionTree noGoodRouteTest = new BinaryDecisionTree( new TreeAttributePredicate(
 					"GoodRoute", "reports", TreeAttributePredicate.Comparator.equal, 0));
 			BinaryDecisionTree routingLoopTest = new BinaryDecisionTree( new TreeAttributePredicate(
-					"RoutingLoops", "reports", TreeAttributePredicate.Comparator.greater, 2));
+					"RoutingLoops", "reports", TreeAttributePredicate.Comparator.greater, 0));
 			BinaryDecisionTree noRebootsTest = new BinaryDecisionTree( new TreeAttributePredicate(
 					"RebootsLastEpoch", "reboots", TreeAttributePredicate.Comparator.equal, 0));
 			BinaryDecisionTree nodeCrash = BinaryDecisionTree.createTupleResultNode ("NodeCrash");
 			BinaryDecisionTree nodeOK = BinaryDecisionTree.createTupleResultNode ("NodeOK");
 			BinaryDecisionTree sinkTest = new BinaryDecisionTree( new TreeAttributePredicate(
 					"PacketsLastEpoch", "nodeID", TreeAttributePredicate.Comparator.equal, theSinkID));
-			BinaryDecisionTree sinkTest2 = new BinaryDecisionTree( new TreeAttributePredicate(
-					"PacketsLastEpoch", "nodeID", TreeAttributePredicate.Comparator.equal, theSinkID));
 			BinaryDecisionTree waitingPackets = BinaryDecisionTree.createTupleResultNode("WaitingPackets");
 			BinaryDecisionTree waitingNeighbours = BinaryDecisionTree.createTupleResultNode("WaitingNeighbours");
 			BinaryDecisionTree waitingPath = BinaryDecisionTree.createTupleResultNode("WaitingPath");
 			BinaryDecisionTree waitingRoute = BinaryDecisionTree.createTupleResultNode("WaitingRoute");
-			
-			coveredTest.setTrue( noPacketReceivedTest );
-			coveredTest.setFalse( noWitnessTest );
-			noWitnessTest.setTrue ( nodeCrash );
-			noWitnessTest.setFalse( noGoodRouteTest );
-			noPacketReceivedTest.setTrue ( nodeCrash );
-			noPacketReceivedTest.setFalse (  noRebootsTest );
-			noPacketReceivedTest.setDefault( waitingPackets );
-			noRebootsTest.setFalse( BinaryDecisionTree.createTupleResultNode("NodeReboot"));
-			noRebootsTest.setTrue( noNeighboursTest);
-			noRebootsTest.setDefault(noNeighboursTest);
-			noNeighboursTest.setFalse( noPathTest );
-			noNeighboursTest.setTrue( sinkTest2 );
-			noNeighboursTest.setDefault( waitingNeighbours );
+			BinaryDecisionTree notCovert = BinaryDecisionTree.createTupleResultNode("NotCovert");
 
-			// sinks don't need neighbours
-			sinkTest2.setTrue(nodeOK);
-			sinkTest2.setFalse(BinaryDecisionTree.createTupleResultNode ("NoNeighbours"));
-
-			noPathTest.setFalse( sinkTest );
-			noPathTest.setTrue( networkPartitionTestB );
-			noPathTest.setDefault ( waitingPath );
-
-			// sinks don't send data to sink
-			sinkTest.setTrue(nodeOK);
-			sinkTest.setFalse(noGoodRouteTest);
-
-			// result: NetworkPartitioned (No Parent)
+			// result: NetworkPartitioned 
 			BinaryDecisionTree networkPartitionNoPath = new BinaryDecisionTree () {
 				final int crashedID = Tuple.getAttributeId("crashedNodes");
 				final int resultID = Tuple.getAttributeId("result");
@@ -392,15 +363,8 @@ public class EWSNDebugger {
 					return tuple;
 				}
 			};
-			networkPartitionTestB.setTrue( networkPartitionNoPath );
-			networkPartitionTestB.setFalse( BinaryDecisionTree.createTupleResultNode ("NoParent"));
-			networkPartitionTestB.setDefault(  BinaryDecisionTree.createTupleResultNode ("NoParent") );
-
-			noGoodRouteTest.setFalse(BinaryDecisionTree.createTupleResultNode ("NodeOK") );
-			noGoodRouteTest.setTrue( networkPartitionTestC );
-			noGoodRouteTest.setDefault( waitingRoute );
 			
-			// result: NetworkParitioned (No Good Route)
+			// result: NetworkParitioned
 			BinaryDecisionTree networkPartitionNoGoodRoute = new BinaryDecisionTree () {
 				final int crashedID = Tuple.getAttributeId("crashedNodes");
 				final int resultID = Tuple.getAttributeId("result");
@@ -411,14 +375,58 @@ public class EWSNDebugger {
 					return tuple;
 				}
 			};
+
+			coveredTest.setTrue( noPacketReceivedTest );
+			coveredTest.setFalse( noPacketReceivedTest2 );
+			
+			noPacketReceivedTest.setTrue ( nodeCrash );
+			noPacketReceivedTest.setFalse (  noRebootsTest );
+			noPacketReceivedTest.setDefault( waitingPackets );
+			
+			noRebootsTest.setFalse( BinaryDecisionTree.createTupleResultNode("NodeReboot"));
+			noRebootsTest.setTrue( sinkTest);
+			noRebootsTest.setDefault(sinkTest);
+
+			sinkTest.setTrue(nodeOK);
+			sinkTest.setFalse(noGoodRouteTest);
+
+			noGoodRouteTest.setFalse(BinaryDecisionTree.createTupleResultNode ("NodeOK") );
+			noGoodRouteTest.setTrue( noNeighboursTest );
+			noGoodRouteTest.setDefault( waitingRoute );
+
+			noNeighboursTest.setFalse( noPathTest );
+			noNeighboursTest.setTrue( BinaryDecisionTree.createTupleResultNode ("NoNeighbours") );
+			noNeighboursTest.setDefault( waitingNeighbours );
+
+			// no path (incl. network part test)
+			noPathTest.setFalse( networkPartitionTestC ); // next test
+			noPathTest.setTrue( networkPartitionTestB );
+			noPathTest.setDefault ( waitingPath );
+
+			networkPartitionTestB.setTrue( networkPartitionNoPath );
+			networkPartitionTestB.setFalse(    BinaryDecisionTree.createTupleResultNode ("NoParent"));
+			networkPartitionTestB.setDefault(  BinaryDecisionTree.createTupleResultNode ("NoParent") );
+			
+			// network partition test
 			networkPartitionTestC.setTrue( networkPartitionNoGoodRoute );
-			networkPartitionTestC.setFalse( routingLoopTest);
+			networkPartitionTestC.setFalse(    routingLoopTest);
 			networkPartitionTestC.setDefault(  routingLoopTest );
 
+			// routing loop
 			routingLoopTest.setTrue(BinaryDecisionTree.createTupleResultNode ("RoutingFailureLoop") );
 			routingLoopTest.setDefault(BinaryDecisionTree.createTupleResultNode ("RoutingFailureGeneral") );
 			routingLoopTest.setFalse(BinaryDecisionTree.createTupleResultNode ("RoutingFailureGeneral") );
-
+			
+			// Not Covert - if good route OK, otherwise complain
+			// noGoodRouteTest2.setTrue( BinaryDecisionTree.createTupleResultNode ("NodeOK"));
+			// noGoodRouteTest2.setFalse(notCovert);
+			// noGoodRouteTest2.setDefault(notCovert);
+			noPacketReceivedTest2.setTrue( nodeCrash);
+			noPacketReceivedTest2.setFalse( notCovert);
+			noPacketReceivedTest2.setDefault( notCovert);
+			
+			// end of tree
+			
 			GroupingEvaluator stateDetector = GroupingEvaluator.createBinaryTreeEvaluator(coveredTest, "nodeID","stateDetector");
 			metricStream.subscribe( stateDetector , 0);
 
@@ -491,13 +499,11 @@ public class EWSNDebugger {
 				}
 			});
 
-
-
 			// --- let's wait for user..
 
-			EWSNDebugger.start = new Object();
-			synchronized(EWSNDebugger.start) {
-				EWSNDebugger.start.wait();
+			debugger.start = new Object();
+			synchronized(debugger.start) {
+				debugger.start.wait();
 			}
 
 			System.out.println( "ewsn snif demo started..");
@@ -506,13 +512,13 @@ public class EWSNDebugger {
 			AbstractSource<PacketTuple> dsnPacketSource = null;
 			DSNConnector dsnConnection = null;
 
-			if (useLog) {
-				LogReader logReader = LogReader.createLogReaderFromFile(PACKET_INPUT);
+			if (debugger.useLog) {
+				LogReader logReader = LogReader.createLogReaderFromFile(debugger.PACKET_INPUT);
 				logReader.setParser(parser);
 				dsnPacketSource = logReader;
 			}
 
-			if (useDSN) {
+			if (debugger.useDSN) {
 
 				// create log file based on current time
 				dsnLogWriter = new FileWriter("log_"+(System.currentTimeMillis()/1000));
@@ -660,6 +666,8 @@ public class EWSNDebugger {
 							view.setNodeState(addr, Color.yellow);
 						} else if (type.startsWith("Waiting")){
 							view.setNodeState(addr, Color.gray);
+						} else if (type.startsWith("NotCovert")){
+							view.setNodeState(addr, Color.orange);
 						} else {
 							view.setNodeState(addr, Color.red);
 						}
@@ -830,6 +838,7 @@ public class EWSNDebugger {
 		Tuple.registerTupleType( "NodeOK",       "nodeID");
 		Tuple.registerTupleType( "RoutingFailureLoop",    "nodeID");
 		Tuple.registerTupleType( "RoutingFailureGeneral", "nodeID");
+		Tuple.registerTupleType( "NotCovert", "nodeID");
 
 		Tuple.registerTupleType( "WaitingPackets", "nodeID");
 		Tuple.registerTupleType( "WaitingNeighbours", "nodeID");

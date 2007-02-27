@@ -76,7 +76,7 @@ public class View extends JFrame implements ActionListener, ChangeListener {
 	/** whole graph */
 	private Graph g;
 	
-	private ActionListener controller;
+	private SNIFController controller;
 	
 	private VisualizationViewer vv;
 	private AbstractLayout layout;
@@ -143,10 +143,10 @@ public class View extends JFrame implements ActionListener, ChangeListener {
 
 	private JButton stop;
 
-    public View() {
+    public View(SNIFController controller) {
     	super("SNIF: Sensor Network Inspection Framework");
     	// this.controller = controller;
-    	this.controller = this;
+    	this.controller = controller;
 		g = new DirectedSparseGraph();	
 		oldDescription = "";
 		oldMetrics = "";
@@ -246,7 +246,7 @@ public class View extends JFrame implements ActionListener, ChangeListener {
         });
         
         connect = new JButton("Connect");
-		connect.addActionListener(controller);
+		connect.addActionListener(this);
         
         JButton reorder = new JButton("Reorder");
         reorder.addActionListener(new ActionListener() {
@@ -257,10 +257,10 @@ public class View extends JFrame implements ActionListener, ChangeListener {
         });
         
         open = new JButton("Open");
-		open.addActionListener(controller);
+		open.addActionListener(this);
         
         stop = new JButton("Stop");
-		stop.addActionListener(controller);
+		stop.addActionListener(this);
         stop.setEnabled(false);
         
         speedSlider = new JSlider(JSlider.HORIZONTAL);
@@ -601,20 +601,20 @@ public class View extends JFrame implements ActionListener, ChangeListener {
 		// TODO Auto-generated method stub
 		System.out.println(arg0);
 		if (arg0.getActionCommand().equals("Connect")) {
-			EWSN.useDSN = true;
-			EWSN.useLog = false;
+			controller.useDSN = true;
+			controller.useLog = false;
 			connect.setEnabled(false);
 			open.setEnabled(false);
 	        speedSlider.setEnabled(false);
 			reset();
-			synchronized(EWSN.start) {;
+			synchronized(controller.start) {;
 			
-				EWSN.start.notify();
+				controller.start.notify();
 			}
 			stop.setEnabled(true);
 		} else if (arg0.getActionCommand().equals("Open")) {
-			EWSN.useDSN = false;
-			EWSN.useLog = true;
+			controller.useDSN = false;
+			controller.useLog = true;
 			FileDialog fd = new FileDialog(this, "Open SNIF Log File...");
 			fd.setDirectory( new File(".").getAbsolutePath());
 			fd.setFilenameFilter(new FilenameFilter() {
@@ -627,9 +627,9 @@ public class View extends JFrame implements ActionListener, ChangeListener {
 				connect.setEnabled(false);
 				open.setEnabled(false);
 				reset();
-				EWSN.PACKET_INPUT = fd.getDirectory()+File.separator+fd.getFile();
-				synchronized(EWSN.start) {
-					EWSN.start.notify();
+				controller.PACKET_INPUT = fd.getDirectory()+File.separator+fd.getFile();
+				synchronized(controller.start) {
+					controller.start.notify();
 				}
 				stop.setEnabled(true);
 		        speedSlider.setEnabled(true);

@@ -2,8 +2,8 @@ package gui;
 
 public abstract class SNIFController {
 
-	boolean useLog = false;
-	boolean useDSN = false;
-	Object start = null;
-	String PACKET_INPUT = null;
+	protected boolean useLog = false;
+	protected boolean useDSN = false;
+	protected Object start = null;
+	protected String PACKET_INPUT = null;
 }
