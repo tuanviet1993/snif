@@ -43,7 +43,7 @@ import edu.uci.ics.jung.graph.ArchetypeVertex;
 import edu.uci.ics.jung.graph.Edge;
 import edu.uci.ics.jung.graph.Graph;
 import edu.uci.ics.jung.graph.Vertex;
-import edu.uci.ics.jung.graph.decorators.EdgeColorFunction;
+import edu.uci.ics.jung.graph.decorators.EdgePaintFunction;
 import edu.uci.ics.jung.graph.decorators.EdgeShape;
 import edu.uci.ics.jung.graph.decorators.EdgeStringer;
 import edu.uci.ics.jung.graph.decorators.EdgeStrokeFunction;
@@ -230,14 +230,18 @@ public class View extends JFrame implements ActionListener, ChangeListener {
                     return thick;
             }
         });
-        // also use color
-        pr.setEdgeColorFunction( new EdgeColorFunction() {
-			public Color getEdgeColor(Edge e) {
+        
+        pr.setEdgePaintFunction( new EdgePaintFunction() {
+			public Paint getDrawPaint(Edge e) {
 				int pc = (Integer) e.getUserDatum(packetCountKey);
 				if (pc == 0)
 					return Color.black;
 				else 
 					return Color.blue;
+			}
+
+			public Paint getFillPaint(Edge e) {
+				return EdgePaintFunction.TRANSPARENT;
 			}
         });
         
