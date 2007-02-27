@@ -1,6 +1,7 @@
 package dsn;
 import java.io.IOException;
 
+import javax.bluetooth.BluetoothStateException;
 import javax.bluetooth.DeviceClass;
 import javax.bluetooth.DiscoveryAgent;
 import javax.bluetooth.DiscoveryListener;
@@ -43,16 +44,18 @@ public class DSNConnector extends Thread implements DiscoveryListener {
 
 	public void init() {
 		view = this;
-		try {
-			LocalDevice local = LocalDevice.getLocalDevice();
-			agent = local.getDiscoveryAgent();
-		} catch (Exception ex) {
-		}
+			LocalDevice local;
+			try {
+				local = LocalDevice.getLocalDevice();
+				agent = local.getDiscoveryAgent();
+			} catch (BluetoothStateException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
 	}
 	
 	public void deviceDiscovered(RemoteDevice btDevice, DeviceClass cod) {
 		String address = btDevice.getBluetoothAddress();
-		
 		if (snifGateway != null) return;
 		
 		if (address.startsWith(btPrefix)   &&
