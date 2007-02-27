@@ -44,6 +44,7 @@ import stream.tuple.TupleChangePredicate;
 import stream.tuple.TupleTimeWindowDistinctGroupAggregator;
 import stream.tuple.TupleTimeWindowGroupAggregator;
 import dsn.DSNConnector;
+import edu.uci.ics.jung.visualization.Coordinates;
 
 /**
  * Detection Algo Implementation based on generic tuple processing
@@ -78,7 +79,22 @@ public class EWSN extends SNIFController {
 
 	private static PDL parser;
 
+	private int nodeList [] = {
+	144 , 160 , 177 , 180 , 236 ,
+	237 , 243 , 267 , 272 , 292 ,
+	288 , 313 , 340 , 382 , 387			
+    };
 
+	private void setNodePositions() {
+		HashMap<Integer, Coordinates> nodePositions = new HashMap<Integer, Coordinates>();
+		// get position. 5 nodes per row. 160 / 4 = 40
+		for (int i = 0; i<nodeList.length; i++ ){
+				int scale = 5;
+				Coordinates coords = new Coordinates( ((i % 5)*30 + 10) *scale,((i/5) * 25 + 12)* scale);
+				nodePositions.put( nodeList[i], coords);
+		}
+		view.setNodeCoordinates(nodePositions);
+	}
 	
 	/**
 	 * @param dsnLogWriter
@@ -130,6 +146,9 @@ public class EWSN extends SNIFController {
 		view = new View(this);
 		view.establish();
 		view.setVisible(true);
+		
+		// fix node positions
+		setNodePositions();
 		
 		parser = Parser.readDescription(PACKETDEFINITION);
 		registerTuples();
