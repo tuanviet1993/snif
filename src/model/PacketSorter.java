@@ -8,9 +8,10 @@ import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
-import java.util.LinkedList;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import util.LinkDumpParser;
 
 /**
  * PacketSorter processes incoming Packets from several LinkDumpParsers and 
@@ -253,12 +254,6 @@ public class PacketSorter {
 	public int getParserCount() {
 		return parsers.size();
 	}
-
-	
-	public static void postEvent(Event event) {
-		events.add(event);
-	}
-
 	
 	/** constants */
 	public static final long epoch = 540 * 1000;
@@ -291,7 +286,4 @@ public class PacketSorter {
 	/** The time is the last entry in the second line
 	 * # (/home/mringwal/.sympathy_3/group1.1000die27.600traffic30.epoch3.iter1a.sim) Wed May 17 02:12:29 CEST 2006 */
 	static Pattern baseTimeFilter = Pattern.compile(".*\\(.*\\)\\s*(.*)");
-	
-	/** Event Queue */
-	static LinkedList<Event> events = new LinkedList<Event>();
 }
