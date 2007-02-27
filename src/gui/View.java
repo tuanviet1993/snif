@@ -66,12 +66,8 @@ import edu.uci.ics.jung.visualization.control.ModalGraphMouse;
 
 public class View extends JFrame implements ActionListener, ChangeListener {
 
-	private static boolean haveCoordinates = true;
-	private int nodeList [] = {
-			144 , 160 , 177 , 180 , 236 ,
-			237 , 243 , 267 , 272 , 288 ,
-			292 , 313 , 340 , 382 , 387			
-	};
+	private boolean haveCoordinates = false;
+	private HashMap<Integer, Coordinates> nodeCoordinates = null;
 
 	/** whole graph */
 	private Graph g;
@@ -458,8 +454,6 @@ public class View extends JFrame implements ActionListener, ChangeListener {
      * a packet lists this node */
     public  void nodeSeen( int address) {
     	String addr = "" + address;
-    	// System.out.println("nodeSeen "+addr);
-
     	if (address == 65535) return;
     	if (address == 65536) return;
     	
@@ -471,26 +465,21 @@ public class View extends JFrame implements ActionListener, ChangeListener {
     	   	node.addUserDatum(vertexKey, addr, UserData.CLONE);
 	    	node.addUserDatum(statusKey, Color.GRAY, UserData.CLONE);
 	    	g.addVertex(node);
-//        	layout.update();
-	    	Object coordKey = layout.getBaseKey();
 	    	if (haveCoordinates){
-	    		// get position. 5 nodes per row. 160 / 4 = 40
-	    		for (int i = 0; i<nodeList.length; i++ ){
-	    			if (nodeList[i] == address) {
-	    				layout.lockVertex(node);
-	    				int scale = 5;
-//	    				Coordinates coords = layout.getCoordinates(node);
-	    				Coordinates coords = new Coordinates( ((i % 5)*30 + 10) *scale,((i/5) * 25 + 12)* scale);
-	    				node.addUserDatum(coordKey, coords, UserData.REMOVE);
-	    		    	break;
-	    			}
+		    	Object coordKey = layout.getBaseKey();
+				Coordinates coords = nodeCoordinates.get( address );
+	    		if (coords != null) {
+					layout.lockVertex(node);
+		    		node.addUserDatum( coordKey, coords, UserData.SHARED);
 	    		}
 	    	}
-        	vv.repaint();
+	    	((FRLayout) layout).update();
+	    	vv.repaint();
         	writeMessage("Node "+addr+" added");
     	}
     }
-    
+
+
     /**
      * node state changes
      * @param args
@@ -502,9 +491,7 @@ public class View extends JFrame implements ActionListener, ChangeListener {
     	nodeSeen( address );
     	Vertex node = getNodeVertex( addr);
     	if (node != null) {
-    		// System.out.println("setNodeState: "+addr + " " + color);
     		node.setUserDatum(statusKey, color, UserData.CLONE);
-//        	layout.update();
         	vv.repaint();
         	writeMessage("Node "+addr+" state changed");
     	}
@@ -659,5 +646,10 @@ public class View extends JFrame implements ActionListener, ChangeListener {
 		if (!source.getValueIsAdjusting()) {
 			Scheduler.speed = (float) Math.pow( 4, source.getValue() -1 );
 		}
+	}
+
+	public void setNodeCoordinates(HashMap<Integer, Coordinates> nodeCoordinates) {
+		this.nodeCoordinates = nodeCoordinates;
+		this.haveCoordinates = true;
 	}
 }
