@@ -1,5 +1,13 @@
 README for Sensor Network Inspection Framework
 
+REQUIREMENTS
+1. A JSR-82 implementation if live data should be received from the distributed sniffer
+Note that the Bluetooth Stack of Windows XP does not support L2CAP, so there is no
+JSR-82 implementation which can provide L2CAP connections on top of that.
+The JSR-82 BT stack from avetana works on top of a widcomm stack.
+The avetana bt stack is fine for linux (even free) and mac os x.
+
+
 COMPILE
 run "ant libs" to download the required libraries
 run "ant javacc" to create the packet defininition parser
@@ -12,4 +20,12 @@ source="1.5" option and ant fails.
 you can use Eclipse to compile the sources instead
 
 
+TEST
+A quick test could be the following:
+- install the sniffer application from sniffer/ on BTnode A
+- install the simpel data gathering application from test/routing_a on BTnode B
+- run the DSNPacketDumper class
+If everything is ok, the application will connect to the first BTnode it finds,
+send the sniffer configuration and will start forwarding overheared ChipCon CC1000
+traffic to the host.
 
