@@ -1,4 +1,4 @@
-package model;
+package util;
 import java.io.BufferedReader;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
@@ -7,6 +7,8 @@ import java.io.StringReader;
 import java.util.StringTokenizer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import model.Packet;
 
 /**
  * Parser for LinkDump Logs created by EmStar LinkDump Tool
