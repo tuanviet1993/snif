@@ -502,11 +502,8 @@ void sendTimeStamp(void){
     bt_hci_con_handle_t con_handle;
 	struct timestamp t;
 
-	printf("sendTimeStamp\n");
-
     // update time info based on own bt clock, clock offset and parent timestamp
     getBtClockSample();
-    printf("1.. ");
     if (snif_am_sink) {
         offsetToParent = 0;
         offsetToRoot   = 0;
@@ -535,12 +532,11 @@ void sendTimeStamp(void){
         offsetToRoot = offsetToParent + parentStamp.root_bt_clock_offset;
     }
     // fill in packet
-    printf("3.. ");
     t.bt_clock = sample_bt_clock;
 	t.sync_round = time_sync_round;
     t.root_bt_clock_offset = offsetToRoot;
     bt_hci_get_local_bt_addr( bt_stack, t.bt_addr);
-    printf("Timesync: Root BT clock %lu: my BT clock %lu, parent BT clock %lu, Round %u\n", t.bt_clock + offsetToRoot, t.bt_clock, t.bt_clock + offsetToParent, time_sync_round);
+    //   printf("Timesync: Root BT clock %lu: my BT clock %lu, parent BT clock %lu, Round %u\n", t.bt_clock + offsetToRoot, t.bt_clock, t.bt_clock + offsetToParent, time_sync_round);
     
     // send my clock to all neighbours to re-inforce tree
     num_cons = con_mgr_get_rel_cons( rel_cons);
@@ -778,9 +774,6 @@ THREAD ( WORKER, arg){
 	snif_set_config = 0;
 	snif_send_timestamp = 0;
 
-    // enable debug uart to slow down bt communication (prevent crash !!!)
-    _bt_hci_debug_uart = 1;
-    
 	printf("WORKER: started\n");
 	
 	while(1){
@@ -790,28 +783,22 @@ THREAD ( WORKER, arg){
 		
 		// configure MAC sniffer
 		if (snif_set_config){
-            printf("\n/** A\n");
             // prettyPrintConfig();
 			sniffer_config(&snif_config);
 			snif_set_config = 0;
 			NutEventPost( &snif_config_queue);
-            printf("A */\n");
 		}
 		
 		// broadcast MAC sniffer config on mhop
 		if (snif_send_config){
-            printf("\n/** B\n");
 			broadcastConfig();
 			snif_send_config = 0;
-            printf("B */\n");
 		}
 		
 		// send timestamp to neighbours
 		if (snif_send_timestamp){
-            printf("\n/** C\n");
 			sendTimeStamp();
 			snif_send_timestamp = 0;
-            printf("C */\n");
 		}
 		
 		// check networking. if not sink and no reliable connections, enable periodic enquiry
@@ -824,11 +811,9 @@ THREAD ( WORKER, arg){
         
         // forward packets in packet queue
 		while (packet_count > 0){
-            printf("\n/** D\n");
 			packet = packet_queue_get_next();
 			sendSniffedPacket( packet );
 			packet_buffer_free( packet );
-            printf("D */\n");
 		}
 		
 		// send time info to host after 900 ticks (1024 ticks per second)
