@@ -12,7 +12,6 @@ import java.util.HashMap;
 import model.NodeAddress;
 import packetparser.DecodedPacket;
 import packetparser.PDL;
-import packetparser.PacketTemplate;
 import packetparser.Parser;
 import packetparser.PhyConfig;
 import stream.AbstractPipe;
@@ -153,7 +152,6 @@ public class EWSNDebugger extends SNIFController {
 		
 		parser = Parser.readDescription(PACKETDEFINITION);
 		registerTuples();
-		registerPackets(parser);
 		// parser.dumpDescription();
 	}
 
@@ -803,19 +801,6 @@ public class EWSNDebugger extends SNIFController {
 			} catch (IOException e) { /** */}
 		}
 	}
-	
-	/**
-	 * @param parser
-	 * @param packetType
-	 */
-	private static void registerPacketType(final PDL parser, String packetType) {
-		PacketTemplate template = parser.getPacketTemplate(packetType);
-		String fields[] = template.getAttributeNames();
-		for (String field : fields ) {
-			String fullyQualifiedField = packetType+"."+field;
-			Tuple.registerTupleField(fullyQualifiedField );
-		}
-	}
 
 	/**
 	 * 
@@ -865,19 +850,6 @@ public class EWSNDebugger extends SNIFController {
 		
 	}
 
-	/**
-	 * @param parser
-	 * TODO automatically register all packets in PDL file
-	 */
-	private static void registerPackets(final PDL parser) {
-		registerPacketType(parser, "beacon_packet");
-		registerPacketType(parser, "advert_packet");
-		registerPacketType(parser, "distance_packet");
-		registerPacketType(parser, "data_packet");
-		registerPacketType(parser, "bmac_msg_st");
-		registerPacketType(parser, "ccc_packet_st");
-	}
-	
 	static final TupleAttribute bmac_src_Attribute = new TupleAttribute("bmac_msg_st.source");
 	static final TupleAttribute bmac_dst_Attribute = new TupleAttribute("bmac_msg_st.destination");
 	static final TupleAttribute seenNode_Attribute = new TupleAttribute("seenNode");

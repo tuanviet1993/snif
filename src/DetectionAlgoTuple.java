@@ -9,7 +9,6 @@ import model.NodeAddress;
 import model.PacketSorter;
 
 import packetparser.PDL;
-import packetparser.PacketTemplate;
 import packetparser.Parser;
 import stream.*;
 import stream.tuple.*;
@@ -57,7 +56,6 @@ public class DetectionAlgoTuple {
 		// init
 		final PDL parser = Parser.readDescription("packetdefinitions/tosmsg.h");
 		registerTuples();
-		registerPackets(parser);
 
 		// use only limited set of dsn nodes
 		PacketSorter.dsnNodes = new int[] { 31, 33, 35 };
@@ -481,19 +479,6 @@ public class DetectionAlgoTuple {
 	}
 
 	/**
-	 * @param parser
-	 * @param packetType
-	 */
-	private static void registerPacketType(final PDL parser, String packetType) {
-		PacketTemplate template = parser.getPacketTemplate(packetType);
-		String fields[] = template.getAttributeNames();
-		for (String field : fields ) {
-			String fullyQualifiedField = packetType+"."+field;
-			Tuple.registerTupleField(fullyQualifiedField );
-		}
-	}
-
-	/**
 	 * 
 	 */
 	private static void registerTuples() {
@@ -523,16 +508,6 @@ public class DetectionAlgoTuple {
 		Tuple.registerTupleType( "ObservationQuality", "min", "max", "count", "ratio", "nodeID", "last");
 		Tuple.registerTupleType( "NodePartitioned", "partitioned", "nodeID", "crashedNodes");
 		Tuple.registerTupleType( "NetworkPartitioned", "nodeID", "crashedNodes", "result");
-	}
-
-	/**
-	 * @param parser
-	 */
-	private static void registerPackets(final PDL parser) {
-		registerPacketType(parser, "TOS_Msg");
-		registerPacketType(parser, "LinkEstimatorBeacon");
-		registerPacketType(parser, "LinkAdvertisement");
-		registerPacketType(parser, "PathAdvertisement");
 	}
 
 	/** pattern to get information [nodeId,time] of injected node crash */
