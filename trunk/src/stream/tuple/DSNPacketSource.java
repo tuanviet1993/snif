@@ -91,16 +91,16 @@ public class DSNPacketSource extends AbstractSource<PacketTuple> implements Real
 		return (long) ((float) (btClock-btClockRef) * 0.3125);
 	}
 	
-	private int unsignedByteToInt(byte value) {
-		if (value > 0) return value;
+	static private int unsignedByteToInt(byte value) {
+		if (value >= 0) return value;
 		return value+256;
 	}
 
-	private int unsigned16LE( byte[] data, int pos) {
+	static private int unsigned16LE( byte[] data, int pos) {
 		return unsignedByteToInt( data[pos+1] ) << 8 | unsignedByteToInt( data[pos]);
 	}
 
-	private int unsigned32LE( byte[] data, int pos) {
+	static private int unsigned32LE( byte[] data, int pos) {
 		return unsigned16LE( data, pos+2) << 16 | unsigned16LE( data, pos);
 	}
 }
