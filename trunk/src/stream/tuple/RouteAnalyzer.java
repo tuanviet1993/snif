@@ -17,17 +17,17 @@ public final class RouteAnalyzer extends AbstractPipe<Tuple, Tuple> {
 
 	private static boolean dump = false;
 
-	int l2srcID;
+	TupleAttribute l2srcID;
 
-	int l2dstID;
+	TupleAttribute l2dstID;
 
-	int nodeIdField;
+	TupleAttribute nodeIdField;
 
-	int destIdField;
+	TupleAttribute destIdField;
 
-	int timeFieldID;
+	TupleAttribute timeFieldID;
 
-	int hopsFieldID;
+	TupleAttribute hopsFieldID;
 
 	int routingLoopTupleID;
 
@@ -56,17 +56,17 @@ public final class RouteAnalyzer extends AbstractPipe<Tuple, Tuple> {
 			Tuple.registerTupleType("LatencyMeasurement", "nodeID", "time",	"hops");
 			tupleRegisterd = true;
 		}
-		l2srcID = Tuple.getAttributeId("l2src");
+		l2srcID = new TupleAttribute("l2src");
 
-		l2dstID = Tuple.getAttributeId("l2dst");
+		l2dstID = new TupleAttribute("l2dst");
 
-		nodeIdField = Tuple.getAttributeId("nodeID");
+		nodeIdField = new TupleAttribute("nodeID");
 
-		destIdField = Tuple.getAttributeId("destID");
+		destIdField = new TupleAttribute("destID");
 
-		timeFieldID = Tuple.getAttributeId("time");
+		timeFieldID = new TupleAttribute("time");
 
-		hopsFieldID = Tuple.getAttributeId("hops");
+		hopsFieldID = new TupleAttribute("hops");
 
 		routingLoopTupleID = Tuple.getTupleTypeID("RoutingLoop");
 

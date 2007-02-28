@@ -208,4 +208,8 @@ public class DecodedPacket {
 		System.out.println(" aInteger "+aInteger.hashCode() );
 		System.out.println(" bInteger "+bInteger.hashCode() );
 	}
+
+	public int getLength() {
+		return rawData.length;
+	}
 }

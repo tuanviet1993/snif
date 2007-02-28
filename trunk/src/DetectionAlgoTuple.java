@@ -371,8 +371,8 @@ public class DetectionAlgoTuple {
 		
 		// result: NetworkPartitioned (No Parent)
 		BinaryDecisionTree networkPartitionNoPath = new BinaryDecisionTree () {
-			final int crashedID = Tuple.getAttributeId("crashedNodes");
-			final int resultID = Tuple.getAttributeId("result");
+			final TupleAttribute crashedID = new TupleAttribute("crashedNodes");
+			final TupleAttribute resultID = new TupleAttribute("result");
 			public Tuple invoke( HashMap<Object,Tuple> input) {
 				Tuple tuple = Tuple.createTuple("NetworkPartitioned");
 				tuple.setStringAttribute(crashedID, input.get("NodePartitioned").getStringAttribute(crashedID));
@@ -389,8 +389,8 @@ public class DetectionAlgoTuple {
 		
 		// result: NetworkParitioned (No Good Route)
 		BinaryDecisionTree networkPartitionNoGoodRoute = new BinaryDecisionTree () {
-			final int crashedID = Tuple.getAttributeId("crashedNodes");
-			final int resultID = Tuple.getAttributeId("result");
+			final TupleAttribute crashedID = new TupleAttribute("crashedNodes");
+			final TupleAttribute resultID = new TupleAttribute("result");
 			public Tuple invoke( HashMap<Object,Tuple> input) {
 				Tuple tuple = Tuple.createTuple("NetworkPartitioned");
 				tuple.setStringAttribute(crashedID, input.get("NodePartitioned").getStringAttribute(crashedID));
@@ -447,11 +447,14 @@ public class DetectionAlgoTuple {
 		AbstractSink<Tuple> totalDataAggregator = new AbstractSink<Tuple>() {
 			int mhType = parser.getValue("MULTIHOP_MULTIHOPPACKET");
 			int sympathyType = parser.getValue("MULTIHOP_MH_SYMPATHY");
+			final TupleAttribute typeAttribute = new TupleAttribute( "TOS_Msg.type");
+			final TupleAttribute mhTypeAttribute = new TupleAttribute( "MultiHopPacket.type");
+			final TupleAttribute lengthAttribute = new TupleAttribute( "MultiHopPacket.type");
 			public void process(Tuple o, int srcID, long timestamp) {;
 				PacketTuple packetTuple = ((PacketTuple) o);
-				int type = o.getIntAttribute("TOS_Msg.type");
-				if (type != mhType || o.getIntAttribute("MultiHopPacket.type") != sympathyType) { 
-					totalData += packetTuple.getIntAttribute("TOS_Msg.length") + 7; // addr(2)+type+grp+crc(2)
+				int type = o.getIntAttribute(typeAttribute);
+				if (type != mhType || o.getIntAttribute(mhTypeAttribute) != sympathyType) { 
+					totalData += packetTuple.getIntAttribute(lengthAttribute) + 7; // addr(2)+type+grp+crc(2)
 				}
 			}
 		};

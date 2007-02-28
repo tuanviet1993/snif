@@ -14,11 +14,14 @@ public class Tuple {
 
 
 	static class TupleType {
+		// Tuple Type Name
 		String name;
+		// Tuple Type ID
 		int    id;
-		int fields[];
+		// Quick mapping from attribute id to field nr
 		int id2field[];
-		String fieldNames[];
+		// Tuple Attribute 
+		TupleAttribute fieldAttributes[];
 		
 		/**
 		 * @param name
@@ -44,54 +47,50 @@ public class Tuple {
 	 * @param attribute
 	 * @return
 	 */
-	public static int registerTupleField( String attribute) {
+	public static void registerTupleField( String attribute) {
 		if (registeredAttributeNames.containsKey(attribute)) {
-			return getAttributeId( attribute );
+			return; // getAttributeId( attribute );
 		}
 		int fieldID = registeredAttributeNames.size();
 		attributeList.add(attribute);
 		registeredAttributeNames.put(attribute, fieldID);
-		return  fieldID;
+		return; //   fieldID;
 	}
 	
 	public static int registerTupleType( String type, String... fields) {
 		if (registeredTuples.containsKey(type)) {
 			throw new RuntimeException("Tuple "+type+" registered twice");
 		}
+		// assert all fields are registered
 		if (registeredAttributeNames.size() == 0) {
 			registerTupleField("TupleType");
 		}
+		// register new tuple type
 		int newTupleID = tuplesList.size();
 		TupleType newType = new TupleType( type, newTupleID);
-		String newFields[] = new String[fields.length+1];
-		newFields[0] = "TupleType";
-		System.arraycopy(fields, 0, newFields, 1, fields.length);
-		newType.fields = new int[newFields.length];
-		// assure field names exist
-		for (String field : newFields) {
-			Integer fieldID = registeredAttributeNames.get(field);
-			if (fieldID == null) {
-				fieldID = registeredAttributeNames.size();
-				attributeList.add(field);
-				registeredAttributeNames.put(field, fieldID);
-			}
+		tuplesList.add(newType);
+		registeredTuples.put( type, newTupleID);
+
+		// create prototype
+		newType.fieldAttributes = new TupleAttribute[fields.length+1];
+		newType.fieldAttributes[0] = new TupleAttribute("TupleType");
+		int position = 1;
+		for (String field : fields) {;
+			registerTupleField(field);
+			TupleAttribute newField = new TupleAttribute( field );
+			newType.fieldAttributes[position] = newField;
+			position++;
 		}
-		// enter
-		newType.fieldNames = newFields;
 		newType.id2field = new int[attributeList.size()];
 		for (int i = 0; i< newType.id2field.length; i++ ) {
 			newType.id2field[i]=-1;
 		}
-		for (int i = 0; i < newFields.length;i++) {
-			Integer fieldID = registeredAttributeNames.get(newFields[i]);
-			newType.fields[i] = fieldID;
-			newType.id2field[fieldID] = i;
+		for (int i = 0; i<newType.fieldAttributes.length; i++) {
+			newType.id2field[newType.fieldAttributes[i].getID()] = i;
 		}
-		tuplesList.add(newType);
-		registeredTuples.put( type, newTupleID);
 		return newTupleID;
 	}
-	
+
 	public static int  getTupleTypeID( String type) {
 		Integer typeID = registeredTuples.get( type );
 		if (typeID == null) {
@@ -108,13 +107,13 @@ public class Tuple {
 		TupleType prototype = tuplesList.get( typeID);
 		Tuple newTuple = new Tuple();
 		newTuple.tupleTypeId = typeID;
-		newTuple.values = new Object[ prototype.fields.length];
+		newTuple.values = new Object[ prototype.fieldAttributes.length];
 		newTuple.values[0] = prototype.name;
 		newTuple.prototype = prototype;
 		return newTuple;
 	}
 	
-	public static int getAttributeId(String attributeName) {
+	protected static int getAttributeId(String attributeName) {
 		Integer fieldID = registeredAttributeNames.get(attributeName);
 		if (fieldID == null) {
 			throw new RuntimeException("TupleField "+attributeName+" not registered");
@@ -122,31 +121,31 @@ public class Tuple {
 		return fieldID;
 	}
 
-	public  Object getAttribute(int attributeID) {
-		return values[prototype.id2field[attributeID]];
-	}
-	public  int getIntAttribute(int attributeID) {
-		return (Integer) values[prototype.id2field[attributeID]];
-	}
-	public  int getIntAttribute(String attributeID) {
-		return (Integer) values[prototype.id2field[Tuple.getAttributeId(attributeID)]];
-	}
-	public  Object getAttribute(String attributeID) {
-		return values[prototype.id2field[Tuple.getAttributeId(attributeID)]];
-	}
-	public  String getStringAttribute(int attributeID) {
-		return (String) values[prototype.id2field[attributeID]];
+	public Object getAttribute(TupleAttribute attribute) {
+		return values[prototype.id2field[attribute.getID()]];
 	}
 	
-	public  void 	setAttribute(int attributeID, Object value) {
-		values[prototype.id2field[attributeID]] = value;
+	public int getIntAttribute(TupleAttribute aggregateAttribute) {
+		return (Integer) values[prototype.id2field[aggregateAttribute.getID()]];
 	}
-	public  void    setIntAttribute(int attributeID, int value) {
-		values[prototype.id2field[attributeID]] = new Integer(value);
+
+	public String getStringAttribute(TupleAttribute aggregateAttribute) {
+		return (String) values[prototype.id2field[aggregateAttribute.getID()]];
 	}
-	public  void 	setStringAttribute(int attributeID, String value) {
-		values[prototype.id2field[attributeID]] = value;
+	
+
+	public  void setAttribute(TupleAttribute attribute, Object value) {
+		values[prototype.id2field[attribute.getID()]] = value;
 	}
+
+	public void setIntAttribute(TupleAttribute aggregateAttribute, int i) {
+		values[prototype.id2field[aggregateAttribute.getID()]] = new Integer(i);
+	}
+
+	public void setStringAttribute(TupleAttribute attribute, String value) {
+		values[prototype.id2field[attribute.getID()]] = value;
+	}
+
 	public String getType() {
 		return prototype.name;
 	}
@@ -160,10 +159,10 @@ public class Tuple {
 //		result.append( getType() );
 		result.append(" { ");
 		boolean first = true;
-		for (int i = 0; i < prototype.fields.length; i++) {
+		for (int i = 0; i < prototype.fieldAttributes.length; i++) {
 			if (!first)
 				result.append(", ");
-			result.append( attributeList.get( prototype.fields[i]));
+			result.append( prototype.fieldAttributes[i].getName());
 			result.append(" = ");
 			result.append( values[i] );
 			first = false;
@@ -178,8 +177,8 @@ public class Tuple {
 		Tuple idTuple = createTuple( "IDTuple");
 		Tuple metricTuple = createTuple( metricType );
 		int nodeIDAttrID = getAttributeId("nodeID");
-		idTuple.setIntAttribute(nodeIDAttrID, 20);
-		metricTuple.setIntAttribute(nodeIDAttrID, 10);
+		idTuple.values[idTuple.prototype.id2field[nodeIDAttrID]] = new Integer(20);
+		metricTuple.values[metricTuple.prototype.id2field[nodeIDAttrID]] = new Integer(10);
 		System.out.println("idTuple: " + idTuple);
 		System.out.println("metricTuple: " + metricTuple);
 	}

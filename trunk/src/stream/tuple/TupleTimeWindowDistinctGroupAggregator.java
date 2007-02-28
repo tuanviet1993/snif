@@ -12,9 +12,8 @@ public class TupleTimeWindowDistinctGroupAggregator extends
 TimeWindowDistinctGroupAggregator<Tuple, Object, Object, Tuple> {
 
 	protected AggregationFunction<Tuple> aggregator;
-	protected String groupField;
-	protected int groupFieldID;
-	protected int[] distinctFieldID;
+	protected TupleAttribute groupFieldID;
+	protected TupleAttribute[] distinctFieldID;
 	
 	Function<Tuple,Object> fieldGrouper = new Function<Tuple,Object>() {
 		public Object invoke(Tuple argument) {
@@ -48,11 +47,10 @@ TimeWindowDistinctGroupAggregator<Tuple, Object, Object, Tuple> {
 		this.distincter = fieldsDistincter;
 		this.grouper = fieldGrouper;
 		this.aggregator = aggregator;
-		this.groupField = groupField;
-		this.groupFieldID = Tuple.getAttributeId( groupField);
-		distinctFieldID = new int[distinctFields.length];
+		this.groupFieldID = new TupleAttribute( groupField);
+		distinctFieldID = new TupleAttribute[distinctFields.length];
 		for (int i=0; i<distinctFields.length; i++) {
-			this.distinctFieldID[i] = Tuple.getAttributeId(distinctFields[i]);
+			this.distinctFieldID[i] = new TupleAttribute(distinctFields[i]);
 		}
 	}
 	
@@ -67,8 +65,7 @@ TimeWindowDistinctGroupAggregator<Tuple, Object, Object, Tuple> {
 		this.distincter = distincter;
 		this.grouper    = grouper;
 		this.aggregator = aggregator;
-		this.groupField = groupField;
-		this.groupFieldID = Tuple.getAttributeId( groupField);
+		this.groupFieldID = new TupleAttribute( groupField);
 	}
 
 	/**

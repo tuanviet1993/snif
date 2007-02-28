@@ -59,11 +59,15 @@ public class NetworkPartitionDetection extends AbstractPipe<Tuple,Tuple> impleme
 
 	int partionedTupleID = Tuple.getTupleTypeID("NodePartitioned");
 
-	int nodeIDID = Tuple.getAttributeId("nodeID");
+	TupleAttribute nodeIDID = new TupleAttribute("nodeID");
 
-	int partitionedID = Tuple.getAttributeId("partitioned");
+	TupleAttribute partitionedID = new TupleAttribute("partitioned");
 	
-	int crashedNodesIDs = Tuple.getAttributeId("crashedNodes");
+	TupleAttribute crashedNodesIDs = new TupleAttribute("crashedNodes");
+
+	TupleAttribute l2srcAttribute = new TupleAttribute("l2src");
+	
+	TupleAttribute l2dstAttribute = new TupleAttribute("l2dst");
 
 	public long timeUsedNano = 0;
 
@@ -148,9 +152,9 @@ public class NetworkPartitionDetection extends AbstractPipe<Tuple,Tuple> impleme
 		}
 		// check its uplinks
 		for (TimeStampedObject<Tuple> routeSegment : window ) {
-			NodeAddress l2src = new NodeAddress ( routeSegment.object.getIntAttribute("l2src"));
+			NodeAddress l2src = new NodeAddress ( routeSegment.object.getIntAttribute(l2srcAttribute));
 			if ( ! l2src.equals( node )) continue;
-			NodeAddress l2dst = new NodeAddress ( routeSegment.object.getIntAttribute("l2dst"));
+			NodeAddress l2dst = new NodeAddress ( routeSegment.object.getIntAttribute(l2dstAttribute));
 			// upstream node is sink
 			if ( l2dst.equals(sink)) {
 				nodeState.evaluationTime = timestamp;
@@ -198,9 +202,9 @@ public class NetworkPartitionDetection extends AbstractPipe<Tuple,Tuple> impleme
 		// check its uplinks
 		int counter = 0;
 		for (TimeStampedObject<Tuple> routeSegment : window ) {
-			NodeAddress l2src = new NodeAddress ( routeSegment.object.getIntAttribute("l2src"));
+			NodeAddress l2src = new NodeAddress ( routeSegment.object.getIntAttribute(l2dstAttribute));
 			if ( ! l2src.equals( node )) continue;
-			NodeAddress l2dst = new NodeAddress ( routeSegment.object.getIntAttribute("l2dst"));
+			NodeAddress l2dst = new NodeAddress ( routeSegment.object.getIntAttribute(l2dstAttribute));
 
 			// at least one link did exists => partitioned. collect causes
 			counter++;
@@ -260,11 +264,11 @@ public class NetworkPartitionDetection extends AbstractPipe<Tuple,Tuple> impleme
 			window.addLast(new TimeStampedObject<Tuple>(timestamp,o));
 	
 			// check for node id exists
-			NodeAddress l2src = new NodeAddress( o.getIntAttribute("l2src" ));
+			NodeAddress l2src = new NodeAddress( o.getIntAttribute(l2srcAttribute));
 			if ( !nodeStates.containsKey(l2src)) {
 				nodeStates.put( l2src, new NodeState( l2src));
 			}
-			NodeAddress l2dst = new NodeAddress( o.getIntAttribute("l2dst" ));
+			NodeAddress l2dst = new NodeAddress( o.getIntAttribute(l2dstAttribute));
 			if ( !nodeStates.containsKey(l2dst)) {
 				nodeStates.put( l2dst, new NodeState( l2dst ));
 			}

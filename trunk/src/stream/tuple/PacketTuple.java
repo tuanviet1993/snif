@@ -27,10 +27,14 @@ public class PacketTuple extends Tuple implements ITimeStampedObject {
 		return ! ((String) result).startsWith("Attribute");
 	}
 	
-	public  Object getAttribute(int attributeID) {
-		return packet.getIntAttribute( attributeList.get( attributeID));
+	public Object getAttribute(TupleAttribute attribute) {
+		return getAttribute( attribute.getName());
 	}
 
+/*	public Object getAttribute(int attributeID) {
+		return packet.getIntAttribute( attributeList.get( attributeID));
+	}
+*/
 	public  int getIntAttribute(String attributeID) {
 		return (Integer) packet.getIntAttribute( attributeID);
 	}
@@ -50,6 +54,11 @@ public class PacketTuple extends Tuple implements ITimeStampedObject {
 		return "" + packet.getIntAttribute( attributeList.get( attributeID));
 	}
 
+	
+	public int getIntAttribute(TupleAttribute attribute) {
+		return (Integer) packet.getIntAttribute(attribute.getName());
+	}
+	
 	public String toString() {
 		return packet.toString();
 	}

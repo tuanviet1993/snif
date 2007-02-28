@@ -6,7 +6,7 @@ public class TreeAttributePredicate extends TreePredicate {
 
 	private Tuple tuple; 
 	private String tupleType;
-	private String attribute;
+	private TupleAttribute attribute;
 	private Comparator comparator;
 	private FloatComparator comparator2;
 	private int value;
@@ -129,13 +129,13 @@ public class TreeAttributePredicate extends TreePredicate {
 	 */
 	public TreeAttributePredicate(String tupleType,  String attribute, Comparator comparator,  int value) {
 		this.tupleType = tupleType;
-		this.attribute = attribute;
+		this.attribute = new TupleAttribute( attribute );
 		this.comparator = comparator;
 		this.value = value;
 	}
 	public TreeAttributePredicate(String tupleType,  String attribute, Comparator2 comparator,  float value) {
 		this.tupleType = tupleType;
-		this.attribute = attribute;
+		this.attribute = new TupleAttribute( attribute );
 		this.comparator2 = comparator;
 		this.value2 = value;
 	}

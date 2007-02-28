@@ -7,8 +7,8 @@ import stream.Predicate;
 public class TupleChangePredicate extends Predicate<Tuple> {
 	
 	HashMap<Object, Tuple> nodes = new HashMap<Object, Tuple>();
-	int idFieldID;
-	int compareFieldIDs[];
+	TupleAttribute idFieldID;
+	TupleAttribute compareFieldIDs[];
 	int nrFields;
 	
 	public Tuple getTuple(Object nodeID) {
@@ -42,11 +42,11 @@ public class TupleChangePredicate extends Predicate<Tuple> {
 	}
 
 	public TupleChangePredicate( String groupField, String... compareFields) {
-		idFieldID = Tuple.getAttributeId(groupField);
+		idFieldID = new TupleAttribute(groupField);
 		nrFields = compareFields.length;
-		compareFieldIDs = new int[nrFields];
+		compareFieldIDs = new TupleAttribute[nrFields];
 		for (int i = 0; i < nrFields; i++) {
-			compareFieldIDs[i] = Tuple.getAttributeId( compareFields[i]);
+			compareFieldIDs[i] = new TupleAttribute( compareFields[i]);
 		}
 	}
 }

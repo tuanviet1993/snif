@@ -8,7 +8,7 @@ public class TupleGroupAggregator extends AbstractPipe<Tuple, Tuple>{
 
 	protected AggregationFunction<Tuple> aggregator;
 	protected String groupField;
-	protected int groupFieldID;
+	protected TupleAttribute groupFieldID;
 	protected HashMap<Object, Tuple> aggregates = new HashMap<Object,Tuple>();
 	
 	public void process(Tuple o, int srcID, long timestamp) {
@@ -32,9 +32,9 @@ public class TupleGroupAggregator extends AbstractPipe<Tuple, Tuple>{
 	
 	/** hack to calculate the total quality of observations. only valid for a beacon ratio aggregator */
 	public float getObservationQuality() {
-		int minID = Tuple.registerTupleField("min");
-		int maxID = Tuple.registerTupleField("max");
-		int countID = Tuple.registerTupleField("count");
+		TupleAttribute minID = new TupleAttribute("min");
+		TupleAttribute maxID = new TupleAttribute("max");
+		TupleAttribute countID = new TupleAttribute("count");
 
 		long totalPackets = 0;
 		long observedPackets = 0;
@@ -53,6 +53,6 @@ public class TupleGroupAggregator extends AbstractPipe<Tuple, Tuple>{
 	public TupleGroupAggregator(AggregationFunction<Tuple> aggregator, String groupField) {
 		this.aggregator = aggregator;
 		this.groupField = groupField;
-		groupFieldID = Tuple.getAttributeId( groupField);
+		groupFieldID = new TupleAttribute( groupField);
 	}
 }
