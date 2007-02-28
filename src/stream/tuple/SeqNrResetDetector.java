@@ -9,8 +9,8 @@ public class SeqNrResetDetector extends AbstractPipe<Tuple, Tuple> {
 	int maxSeqNq;
 	int expectOverrun;
 	int overrunBuffer;
-	int idFieldID;
-	int seqNrFieldID;
+	TupleAttribute idFieldID;
+	TupleAttribute seqNrFieldID;
 	
 	HashMap<Object, Integer> nodes = new HashMap<Object, Integer>();
 
@@ -30,8 +30,8 @@ public class SeqNrResetDetector extends AbstractPipe<Tuple, Tuple> {
 	}
 	
 	public SeqNrResetDetector(String idField, String seqNrField, int maxSeqNq, int expectOverrun) {
-		idFieldID = Tuple.getAttributeId(idField);
-		seqNrFieldID = Tuple.getAttributeId(seqNrField);
+		idFieldID = new TupleAttribute(idField);
+		seqNrFieldID = new TupleAttribute(seqNrField);
 		this.maxSeqNq = maxSeqNq;
 		this.expectOverrun = maxSeqNq - expectOverrun;
 	}

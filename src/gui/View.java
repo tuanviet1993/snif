@@ -475,6 +475,8 @@ public class View extends JFrame implements ActionListener, ChangeListener {
 	    		if (coords != null) {
 					layout.lockVertex(node);
 		    		node.addUserDatum( coordKey, coords, UserData.SHARED);
+	    		} else {
+	    			System.out.println("View.nodeSeen("+address+"), but not in nodeCoordinates");
 	    		}
 	    	}
 	    	((FRLayout) layout).update();

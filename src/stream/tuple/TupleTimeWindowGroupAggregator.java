@@ -8,7 +8,7 @@ public class TupleTimeWindowGroupAggregator extends TimeWindowGroupAggregator<Tu
 
 	protected AggregationFunction<Tuple> aggregator;
 	protected String groupField;
-	protected int groupFieldID;
+	protected TupleAttribute groupFieldID;
 	
 	Function<Tuple,Object> fieldGrouper = new Function<Tuple,Object>() {
 		public Object invoke(Tuple argument) {
@@ -22,13 +22,13 @@ public class TupleTimeWindowGroupAggregator extends TimeWindowGroupAggregator<Tu
 		this.grouper    = grouper;
 		this.aggregator = aggregator;
 		this.groupField = groupField;
-		this.groupFieldID = Tuple.getAttributeId( groupField);
+		this.groupFieldID = new TupleAttribute( groupField);
 	}
 
 	public TupleTimeWindowGroupAggregator(int timewindow, String groupField, AggregationFunction<Tuple> aggregator, String name) {
 		this.timewindow = timewindow;
 		this.groupField = groupField;
-		this.groupFieldID = Tuple.getAttributeId( groupField);
+		this.groupFieldID = new TupleAttribute( groupField);
 		this.aggregator = aggregator;
 		this.grouper = fieldGrouper;
 	}

@@ -9,7 +9,7 @@ public class AttributePredicate extends Predicate<Tuple> {
 	 * @param attributeValue
 	 */
 	public AttributePredicate(String attributeName, Object attributeValue) {
-		this.attribute = Tuple.getAttributeId( attributeName);
+		this.attribute = new TupleAttribute( attributeName);
 		this.attributeValue = attributeValue;
 		// System.out.println("PacketAttributePredicate: "+attributeName + " == " + attributeValue);
 	}
@@ -21,6 +21,6 @@ public class AttributePredicate extends Predicate<Tuple> {
 		return packet.getAttribute(attribute).equals(attributeValue);
 	}
 	
-	int attribute;
+	TupleAttribute attribute;
 	Object attributeValue;
 }

@@ -40,6 +40,7 @@ import stream.tuple.RouteAnalyzer;
 import stream.tuple.SeqNrResetDetector;
 import stream.tuple.TreeAttributePredicate;
 import stream.tuple.Tuple;
+import stream.tuple.TupleAttribute;
 import stream.tuple.TupleChangePredicate;
 import stream.tuple.TupleTimeWindowDistinctGroupAggregator;
 import stream.tuple.TupleTimeWindowGroupAggregator;
@@ -124,6 +125,10 @@ public class EWSN extends SNIFController {
 			    if (!phyConfig.fixedSize){
 			    	crcPos += packet.getByte(phyConfig.lengthPos) + phyConfig.lengthOffset;
 			    }
+			    // check valid packet size
+			    if (crcPos > packet.getLength()) {
+			    	return false;
+			    }
 			    int crc = 0xffff;
 			    for (int pos=0; pos < crcPos ; pos++ ){
 			    	int data = packet.getByte(pos);
@@ -172,9 +177,8 @@ public class EWSN extends SNIFController {
 		while (true) {
 
 			// create crc filter
-			// Predicate<PacketTuple> crcCheck = createCRCFilter(parser);
-			// Filter<PacketTuple> crcFilter = new Filter<PacketTuple>( crcCheck, "crcFilter"); 
-			// crcFilter.subscribe(dupFilter, 0);
+			Predicate<PacketTuple> crcCheck = createCRCFilter(parser);
+			Filter<PacketTuple> crcFilter = new Filter<PacketTuple>( crcCheck ); 
 
 			// total bandwith aggregator
 			// AbstractSink<Tuple> totalDataAggregator = createTotalBandwidthAggregator();
@@ -191,6 +195,7 @@ public class EWSN extends SNIFController {
 			// filter packets with identical content reported by different DSN nodes within short time (20 ms)
 			DistinctInWindow distinctInWindow = new DistinctInWindow(1000);
 			Filter<PacketTuple> dupFilter = new Filter<PacketTuple>(distinctInWindow);
+			crcFilter.subscribe(dupFilter, 0);
 
 			// extrac layer2 source
 			Mapper packetIdStream = new Mapper( "IDTuple", "bmac_msg_st.source", "nodeID");
@@ -223,8 +228,9 @@ public class EWSN extends SNIFController {
 			// ignore empty entries
 			Filter<Tuple> neighbourTableFilter = new Filter<Tuple>(
 					new Predicate<Tuple>() {
+						final TupleAttribute nodeIDAttribute = new TupleAttribute("node_id");
 						public boolean invoke(Tuple o, long timestamp) {
-							return o.getIntAttribute("node_id") != 0;
+							return o.getIntAttribute(nodeIDAttribute) != 0;
 						}
 					});
 			linkAdvertisementExtractor.subscribe( neighbourTableFilter,0) ;
@@ -373,8 +379,8 @@ public class EWSN extends SNIFController {
 
 			// result: NetworkPartitioned 
 			BinaryDecisionTree networkPartitionNoPath = new BinaryDecisionTree () {
-				final int crashedID = Tuple.getAttributeId("crashedNodes");
-				final int resultID = Tuple.getAttributeId("result");
+				final TupleAttribute crashedID = new TupleAttribute("crashedNodes");
+				final TupleAttribute resultID = new TupleAttribute("result");
 				public Tuple invoke( HashMap<Object,Tuple> input) {
 					Tuple tuple = Tuple.createTuple("NetworkPartitioned");
 					tuple.setStringAttribute(crashedID, input.get("NodePartitioned").getStringAttribute(crashedID));
@@ -385,8 +391,8 @@ public class EWSN extends SNIFController {
 			
 			// result: NetworkParitioned
 			BinaryDecisionTree networkPartitionNoGoodRoute = new BinaryDecisionTree () {
-				final int crashedID = Tuple.getAttributeId("crashedNodes");
-				final int resultID = Tuple.getAttributeId("result");
+				final TupleAttribute crashedID = new TupleAttribute("crashedNodes");
+				final TupleAttribute resultID = new TupleAttribute("result");
 				public Tuple invoke( HashMap<Object,Tuple> input) {
 					Tuple tuple = Tuple.createTuple("NetworkPartitioned");
 					tuple.setStringAttribute(crashedID, input.get("NodePartitioned").getStringAttribute(crashedID));
@@ -477,10 +483,12 @@ public class EWSN extends SNIFController {
 
 			// map "from", "to" -> "linkID=from#to
 			AbstractPipe<Tuple,Tuple> linkEnumeratorNeighbours = new AbstractPipe<Tuple,Tuple>() {
-				final int idField = Tuple.getAttributeId("linkID");
+				final TupleAttribute idField = new TupleAttribute("linkID");
+				final TupleAttribute fromAttribute = new TupleAttribute("reportingNode");
+				final TupleAttribute toAttribute = new TupleAttribute("seenNode");
 				public void process(Tuple o, int srcID, long timestamp) {
-					int from = o.getIntAttribute("reportingNode");
-					int to = o.getIntAttribute("seenNode");
+					int from = o.getIntAttribute(fromAttribute);
+					int to = o.getIntAttribute(toAttribute);
 					Tuple tuple = Tuple.createTuple("LinkTuple");
 					tuple.setAttribute(idField, "" + from + "#" + to);
 					transfer( tuple, timestamp);
@@ -493,10 +501,12 @@ public class EWSN extends SNIFController {
 			linkEnumeratorNeighbours.subscribe(linkNeighboursLastEpoch , 0);
 
 			AbstractPipe<Tuple,Tuple> linkEnumeratorData = new AbstractPipe<Tuple,Tuple>() {
-				final int idField = Tuple.getAttributeId("linkID");
+				final TupleAttribute idField = new TupleAttribute("linkID");
+				final TupleAttribute l2srcAttribute = new TupleAttribute("l2src");
+				final TupleAttribute l2dstAttribute = new TupleAttribute("l2dst");
 				public void process(Tuple o, int srcID, long timestamp) {
-					int from = o.getIntAttribute("l2src");
-					int to = o.getIntAttribute("l2dst");
+					int from = o.getIntAttribute(l2srcAttribute);
+					int to = o.getIntAttribute(l2dstAttribute);
 					Tuple tuple = Tuple.createTuple("LinkTuple");
 					tuple.setAttribute(idField, "" + from + "#" + to);
 					transfer( tuple, timestamp);
@@ -561,7 +571,7 @@ public class EWSN extends SNIFController {
 			if (runDebugger) {
 				dsnLogWriter = null;
 				// dsnPacketSource.subscribe( totalDataAggregator, 0);
-				dsnPacketSource.subscribe( dupFilter, 0);
+				dsnPacketSource.subscribe( crcFilter, 0);
 			}
 
 			Scheduler.run( dsnPacketSource );
@@ -616,6 +626,8 @@ public class EWSN extends SNIFController {
 				int addr;
 				protected String nodeState;
 				protected int battery;
+				
+
 				/**
 				 * @param addr
 				 */
@@ -666,16 +678,17 @@ public class EWSN extends SNIFController {
 				int addr;
 				String type;
 				Metrics metric;
+
 				switch (srcID) {
 					case 1:				
-						view.nodeSeen(o.getIntAttribute("bmac_msg_st.source")+1);
-						view.nodeSeen(o.getIntAttribute("bmac_msg_st.destination")+1);
+						view.nodeSeen(o.getIntAttribute(bmac_src_Attribute)+1);
+						view.nodeSeen(o.getIntAttribute(bmac_dst_Attribute)+1);
 						break;
 					case 2:
-						view.nodeSeen(o.getIntAttribute("seenNode")+1);
+						view.nodeSeen(o.getIntAttribute(seenNode_Attribute)+1);
 						break;
 					case 3:
-						addr = o.getIntAttribute("nodeID") +1;
+						addr = o.getIntAttribute(nodeID_Attribute) +1;
 						type = o.getType();
 						metric = getNodeInfo( addr );
 						metric.nodeState = type;
@@ -692,17 +705,17 @@ public class EWSN extends SNIFController {
 						}
 						break;
 					case 4:
-						addr = o.getIntAttribute("nodeID") +1;
+						addr = o.getIntAttribute(nodeID_Attribute) +1;
 						metric = getNodeInfo( addr );
 						metric.nrReboots++;
 						break;
 					case 5:
 					case 6:
-						String link = (String) o.getAttribute("linkID");
+						String link = (String) o.getAttribute(linkID_Attribute);
 						String parts[] = link.split("#");
 						int from = Integer.parseInt( parts[0]) + 1;
 						int to = Integer.parseInt( parts[1])   + 1;
-						int reports = o.getIntAttribute("reports");
+						int reports = o.getIntAttribute(reports_Attribute);
 						metric = getNodeInfo(from);
 						metric.lastLinkAdv = timestamp / 1000;
 						if (srcID == 5) {
@@ -713,21 +726,21 @@ public class EWSN extends SNIFController {
 						break;
 					case 7:
 						// metric stream
-						addr = o.getIntAttribute("nodeID") + 1;
+						addr = o.getIntAttribute(nodeID_Attribute) + 1;
 						type = o.getType();
 						metric = getNodeInfo( addr );
 						if (type.equals("PacketsLastEpoch")){
-							metric.packetsSend = o.getIntAttribute("packets");
+							metric.packetsSend = o.getIntAttribute(packets_Attribute);
 						} else if (type.equals("RoutesLastEpoch")){
-							metric.nrPathAnnouncement = o.getIntAttribute("routeAnnouncements");
+							metric.nrPathAnnouncement = o.getIntAttribute(routeAnnouncements_Attribute);
 						} else if (type.equals("MaxPathQuality")){
-							metric.lastPathQuality = o.getIntAttribute("quality");
+							metric.lastPathQuality = o.getIntAttribute(quality_Attribute);
 						} else if (type.equals("RoutingLoops")){
-							metric.nrRoutingLoops = o.getIntAttribute("reports");
+							metric.nrRoutingLoops = o.getIntAttribute(reports_Attribute);
 						} else if (type.equals("NeighbourSeenLastEpoch")){
-							metric.nrNeighbours = o.getIntAttribute("sightings");
+							metric.nrNeighbours = o.getIntAttribute(sightings_Attribute);
 						} else if (type.equals("ObservationQuality")){
-							Object ratio = o.getAttribute("ratio");
+							Object ratio = o.getAttribute(ratio_Attribute);
 							if (ratio instanceof Double){
 								metric.observationQuatlity = (Double) ratio;
 							} else {
@@ -740,28 +753,28 @@ public class EWSN extends SNIFController {
 						break;
 					case 8:
 						// seq nr
-						addr = o.getIntAttribute("nodeID") + 1;
+						addr = o.getIntAttribute(nodeID_Attribute) + 1;
 						metric = getNodeInfo( addr );
-						metric.lastSeqNr = o.getIntAttribute("seqNr");
+						metric.lastSeqNr = o.getIntAttribute(seqNr_Attribute);
 						metric.lastBeacon = timestamp / 1000;
 						break;
 					case 9:
 						// path adv
-						addr = o.getIntAttribute("nodeID") + 1;
+						addr = o.getIntAttribute(nodeID_Attribute) + 1;
 						metric = getNodeInfo( addr );
 						metric.lastPathAdv = timestamp / 1000;
-						metric.lastPathRound = o.getIntAttribute("round");
-						metric.lastPathQuality = o.getIntAttribute("quality");
+						metric.lastPathRound = o.getIntAttribute(round_Attribute);
+						metric.lastPathQuality = o.getIntAttribute(quality_Attribute);
 						break;
 					case 10:
-						addr = o.getIntAttribute("node_id") + 1;
+						addr = o.getIntAttribute(node_id_Attribute) + 1;
 						metric = getNodeInfo( addr );
 						metric.lastData = timestamp / 1000;
 						break;
 					case 11:
-						addr = o.getIntAttribute("node_id") + 1;
+						addr = o.getIntAttribute(node_id_Attribute) + 1;
 						metric = getNodeInfo( addr );
-						metric.battery = o.getIntAttribute("beacon_packet.battery");
+						metric.battery = o.getIntAttribute(beacon_packet_battery_Attribute);
 						break;
 				}
 			}
@@ -863,7 +876,6 @@ public class EWSN extends SNIFController {
 		Tuple.registerTupleType( "WaitingNeighbours", "nodeID");
 		Tuple.registerTupleType( "WaitingPath", "nodeID");
 		Tuple.registerTupleType( "WaitingRoute", "nodeID");
-		
 	}
 
 	/**
@@ -878,4 +890,20 @@ public class EWSN extends SNIFController {
 		registerPacketType(parser, "bmac_msg_st");
 		registerPacketType(parser, "ccc_packet_st");
 	}
+	
+	static final TupleAttribute bmac_src_Attribute = new TupleAttribute("bmac_msg_st.source");
+	static final TupleAttribute bmac_dst_Attribute = new TupleAttribute("bmac_msg_st.destination");
+	static final TupleAttribute seenNode_Attribute = new TupleAttribute("seenNode");
+	static final TupleAttribute nodeID_Attribute = new TupleAttribute("nodeID");
+	static final TupleAttribute node_id_Attribute = new TupleAttribute("node_id");
+	static final TupleAttribute linkID_Attribute = new TupleAttribute("linkID");
+	static final TupleAttribute reports_Attribute = new TupleAttribute("reports");
+	static final TupleAttribute routeAnnouncements_Attribute = new TupleAttribute("routeAnnouncements");
+	static final TupleAttribute round_Attribute = new TupleAttribute("round");
+	static final TupleAttribute quality_Attribute = new TupleAttribute("quality");
+	static final TupleAttribute ratio_Attribute = new TupleAttribute("ratio");
+	static final TupleAttribute packets_Attribute = new TupleAttribute("packets");
+	static final TupleAttribute sightings_Attribute = new TupleAttribute("sightings");
+	static final TupleAttribute seqNr_Attribute = new TupleAttribute("seqNr");
+	static final TupleAttribute beacon_packet_battery_Attribute = new TupleAttribute("beacon_packet.battery");
 }

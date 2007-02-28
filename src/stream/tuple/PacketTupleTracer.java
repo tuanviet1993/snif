@@ -14,11 +14,11 @@ public class PacketTupleTracer extends AbstractPipe<Tuple, Tuple> {
 	private final String attrL3seqNr;
 
 	private final int tupleTypeID;
-	private final int tupleL2srcID;
-	private final int tupleL2dstID;
-	private final int tupleL3srcID;
-	private final int tupleL3dstID;
-	private final int tupleL3seqNrID;
+	private final TupleAttribute tupleL2srcID;
+	private final TupleAttribute tupleL2dstID;
+	private final TupleAttribute tupleL3srcID;
+	private final TupleAttribute tupleL3dstID;
+	private final TupleAttribute tupleL3seqNrID;
 	
 	/**
 	 * @param attrL2dst
@@ -33,11 +33,11 @@ public class PacketTupleTracer extends AbstractPipe<Tuple, Tuple> {
 		this.attrL3seqNr = attrL3seqNr;
 		
 		this.tupleTypeID = Tuple.getTupleTypeID(tupleName);
-		tupleL2srcID = Tuple.getAttributeId("l2src");
-		tupleL2dstID = Tuple.getAttributeId("l2dst");
-		tupleL3srcID = Tuple.getAttributeId("l3src");
-		tupleL3dstID = Tuple.getAttributeId("l3dst");
-		tupleL3seqNrID = Tuple.getAttributeId("l3seqNr");
+		tupleL2srcID = new TupleAttribute("l2src");
+		tupleL2dstID = new TupleAttribute("l2dst");
+		tupleL3srcID = new TupleAttribute("l3src");
+		tupleL3dstID = new TupleAttribute("l3dst");
+		tupleL3seqNrID = new TupleAttribute("l3seqNr");
 		
 		tracer = PacketTracer.getPacketTracer();
 		PacketTracer.discardCachedPacket();
