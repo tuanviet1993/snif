@@ -4,15 +4,26 @@ import java.util.HashMap;
 
 public class BinaryDecisionTree {
 
-	private BinaryDecisionTree truePath;
+	protected BinaryDecisionTree truePath;
 
-	private BinaryDecisionTree falsePath;
+	protected BinaryDecisionTree falsePath;
 
-	private BinaryDecisionTree defaultPath = null;
+	protected BinaryDecisionTree defaultPath = null;
 	
 	protected TreePredicate treePredicate;
 
+	protected String resultTuple = null;
+	protected int resultTupleID = -1;
+	
 	public Tuple invoke(HashMap<Object, Tuple> input) {
+		// result tuple?
+		if (resultTuple != null) {
+			if (resultTupleID < 0) {
+				resultTupleID = Tuple.getTupleTypeID(resultTuple);
+			}
+			return Tuple.createTuple(resultTupleID);
+		}
+		
 		if (treePredicate.canEvalute(input)) {
 			if (treePredicate.invoke(input)) {
 				return truePath.invoke(input);
@@ -53,10 +64,16 @@ public class BinaryDecisionTree {
 	}
 
 	public static BinaryDecisionTree createTupleResultNode(final String string) {
-		return 	new BinaryDecisionTree () {
-			public Tuple invoke( HashMap<Object,Tuple> input) {
-				return Tuple.createTuple(string);
-			}
-		};
+		BinaryDecisionTree resultNode = new BinaryDecisionTree();
+		resultNode.resultTuple = string;
+		return resultNode;
+	}
+
+	public String getResultType() {
+		return resultTuple;
+	}
+	
+	public String[] getResultAttributes() {
+		return new String[0];
 	}
 }

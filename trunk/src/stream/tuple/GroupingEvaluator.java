@@ -69,6 +69,8 @@ public class GroupingEvaluator extends
 	}
 
 	public static GroupingEvaluator createBinaryTreeEvaluator(final BinaryDecisionTree theTree, final String groupField, final String name) {
+		// register result tuples
+		registerTreeResultTuples( theTree, groupField);
 		return new GroupingEvaluator (
 				new GroupTupleEvaluationFunction<Tuple>() {
 					TupleAttribute nodeId = new TupleAttribute(groupField);
@@ -88,5 +90,26 @@ public class GroupingEvaluator extends
 				},
 				groupField
 		);
+	}
+
+	private static void registerTreeResultTuples(BinaryDecisionTree theTree, String groupField) {
+		String resultType = theTree.getResultType();
+		if (resultType == null) {
+			if (theTree.defaultPath != null) {
+				registerTreeResultTuples( theTree.defaultPath, groupField );
+			}
+			if (theTree.truePath != null) {
+				registerTreeResultTuples( theTree.truePath, groupField );
+			}
+			if (theTree.falsePath != null) {
+				registerTreeResultTuples( theTree.falsePath, groupField );
+			}
+		} else {
+			String[] resultAttributes = theTree.getResultAttributes();
+			String [] allAttributes = new String[resultAttributes.length+1];
+			allAttributes[0] = groupField;
+			System.arraycopy(resultAttributes, 0, allAttributes, 1, resultAttributes.length);
+			Tuple.registerTupleType ( resultType, allAttributes);
+		}
 	}
 }
