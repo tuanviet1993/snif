@@ -55,7 +55,6 @@ public class DetectionAlgoTuple {
 
 		// init
 		final PDL parser = Parser.readDescription("packetdefinitions/tosmsg.h");
-		registerTuples();
 
 		// use only limited set of dsn nodes
 		PacketSorter.dsnNodes = new int[] { 31, 33, 35 };
@@ -85,11 +84,11 @@ public class DetectionAlgoTuple {
 		// path = basePath + "dsn-07"; 					// single node crash experiment, p=6
 		// path = basePath + "dsn-block01/"; 			// blocking experiment, p=6
 		// path = basePath + "dsn-block02/"; 			// blocking experiment, p=4
-		// path = "dsn-ok01/"; 				// no crash, p=1-6
+		path = "dsn-ok01/"; 				// no crash, p=1-6
 		// path = basePath + "dsn-ok02-newPositions/";	// no crash, p=4, new positions
 		// path = "/Volumes/MRINGWAL/Simulations/dsn-partition11-4to16/";	// network partition, p=4, 4-16 crashed
 		// path = basePath + "dsn-partition12/";		// network partition, p=4, 4-16 crashed
-		path = basePath + "dsn-partition16/";		// network partition 13, p=4, 4-16 crashed
+		// path = basePath + "dsn-partition16/";		// network partition 13, p=4, 4-16 crashed
 		
 		args = new String[] {  path };
 		
@@ -478,37 +477,6 @@ public class DetectionAlgoTuple {
 		System.out.println("dsnSympathy. Done with "+path);
 	}
 
-	/**
-	 * 
-	 */
-	private static void registerTuples() {
-		
-		Tuple.registerTupleType( "IDTuple", "nodeID");
-		Tuple.registerTupleType( "SeqNrTuple", "nodeID", "seqNr");
-		Tuple.registerTupleType( "PacketsLastEpoch", "nodeID", "packets");
-		Tuple.registerTupleType( "RoutesLastEpoch",  "nodeID", "routeAnnouncements");
-		Tuple.registerTupleType( "PathQuality",  "PathAdvertisement.id", "quality");
-		Tuple.registerTupleType( "MaxPathQuality",  "nodeID", "quality");
-		Tuple.registerTupleType( "PathAnnouncement",  "nodeID", "quality");
-		Tuple.registerTupleType( "LinkQuality",  "LinkAdvertisement.id", "id", "quality");
-		Tuple.registerTupleType( "NodeSeen",  "reportingNode", "seenNode");
-		Tuple.registerTupleType( "PacketTracerTuple",  "l2src", "l2dst", "l3src", "l3dst", "l3seqNr");
-		Tuple.registerTupleType( "NeighbourReportsLastEpochTemp",  "seenNode",     "sightings");
-		Tuple.registerTupleType( "NeighbourSeenLastEpochTemp",     "reportingNode", "sightings");
-		Tuple.registerTupleType( "NeighbourReportsLastEpoch",  "nodeID",  "sightings");
-		Tuple.registerTupleType( "NeighbourSeenLastEpoch",     "nodeID", "sightings");
-		Tuple.registerTupleType( "NodeCrash",    "nodeID");
-		Tuple.registerTupleType( "NoNeighbours", "nodeID");
-		Tuple.registerTupleType( "NoParent",      "nodeID");
-		Tuple.registerTupleType( "NodeOK",       "nodeID");
-		Tuple.registerTupleType( "GoodRoute",    "nodeID", "reports");
-		Tuple.registerTupleType( "RoutingLoops", "nodeID", "reports");
-		Tuple.registerTupleType( "RoutingFailureLoop",    "nodeID");
-		Tuple.registerTupleType( "RoutingFailureGeneral", "nodeID");
-		Tuple.registerTupleType( "ObservationQuality", "min", "max", "count", "ratio", "nodeID", "last");
-		Tuple.registerTupleType( "NodePartitioned", "partitioned", "nodeID", "crashedNodes");
-		Tuple.registerTupleType( "NetworkPartitioned", "nodeID", "crashedNodes", "result");
-	}
 
 	/** pattern to get information [nodeId,time] of injected node crash */
 	static Pattern pathPattern = Pattern.compile(".*group\\d++\\.\\d++traffic\\d++\\.(\\d++)die(\\d++).*");

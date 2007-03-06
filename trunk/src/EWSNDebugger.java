@@ -125,6 +125,10 @@ public class EWSNDebugger extends SNIFController {
 			    if (!phyConfig.fixedSize){
 			    	crcPos += packet.getByte(phyConfig.lengthPos) + phyConfig.lengthOffset;
 			    }
+			    // check valid packet size
+			    if (crcPos > packet.getLength()) {
+			    	return false;
+			    }
 			    int crc = 0xffff;
 			    for (int pos=0; pos < crcPos ; pos++ ){
 			    	int data = packet.getByte(pos);
@@ -151,7 +155,6 @@ public class EWSNDebugger extends SNIFController {
 		setNodePositions();
 		
 		parser = Parser.readDescription(PACKETDEFINITION);
-		registerTuples();
 		// parser.dumpDescription();
 	}
 
@@ -216,7 +219,7 @@ public class EWSNDebugger extends SNIFController {
 
 			// translate LinkAdvertisementBeacons into Neighbour sightings
 			ArrayExtractor linkAdvertisementExtractor = new ArrayExtractor( "LinkQuality",
-					"advert_packet.neighbours.length", "advert_packet.neighbours");
+					"advert_packet.neighbours.length", "advert_packet.neighbours", "advert_packet.node_id", "node_id", "quality");
 			linkAdvertisementFilter.subscribe( linkAdvertisementExtractor, 0);
 
 			// ignore empty entries
@@ -406,6 +409,12 @@ public class EWSNDebugger extends SNIFController {
 					tuple.setStringAttribute(resultID, "NoParent");
 					return tuple;
 				}
+				public String getResultType() {
+					return "NetworkPartitioned";
+				}
+				public String[] getResultAttributes() {
+					return new String[] {"crashedNodes", "result"};
+				}
 			};
 			networkPartitionTestB.setTrue( networkPartitionNoPath );
 			networkPartitionTestB.setFalse( BinaryDecisionTree.createTupleResultNode ("NoParent"));
@@ -424,6 +433,12 @@ public class EWSNDebugger extends SNIFController {
 					tuple.setStringAttribute(crashedID, input.get("NodePartitioned").getStringAttribute(crashedID));
 					tuple.setStringAttribute(resultID, "NoGoodRoute");
 					return tuple;
+				}
+				public String getResultType() {
+					return "NetworkPartitioned";
+				}
+				public String[] getResultAttributes() {
+					return new String[] {"crashedNodes", "result"};
 				}
 			};
 			networkPartitionTestC.setTrue( networkPartitionNoGoodRoute );
@@ -482,6 +497,7 @@ public class EWSNDebugger extends SNIFController {
 				new TupleTimeWindowGroupAggregator ( 2 * epoch, "linkID", new Counter( "LinkListed", "reports"),"linkNeighboursLastEpoch");
 			linkEnumeratorNeighbours.subscribe(linkNeighboursLastEpoch , 0);
 
+			Tuple.registerTupleType( "LinkTuple", "linkID");
 			AbstractPipe<Tuple,Tuple> linkEnumeratorData = new AbstractPipe<Tuple,Tuple>() {
 				final TupleAttribute idField = new TupleAttribute("linkID");
 				final TupleAttribute l2srcAttribute = new TupleAttribute("l2src");
@@ -751,12 +767,12 @@ public class EWSNDebugger extends SNIFController {
 						metric.lastPathQuality = o.getIntAttribute(quality_Attribute);
 						break;
 					case 10:
-						addr = o.getIntAttribute(nodeID_Attribute) + 1;
+						addr = o.getIntAttribute(node_id_Attribute) + 1;
 						metric = getNodeInfo( addr );
 						metric.lastData = timestamp / 1000;
 						break;
 					case 11:
-						addr = o.getIntAttribute(nodeID_Attribute) + 1;
+						addr = o.getIntAttribute(node_id_Attribute) + 1;
 						metric = getNodeInfo( addr );
 						metric.battery = o.getIntAttribute(beacon_packet_battery_Attribute);
 						break;
@@ -802,58 +818,11 @@ public class EWSNDebugger extends SNIFController {
 		}
 	}
 
-	/**
-	 * 
-	 * TODO get away with this
-	 */
-	private static void registerTuples() {
-		
-		Tuple.registerTupleType( "PacketsLastEpoch", "nodeID", "packets");
-		Tuple.registerTupleType( "RoutesLastEpoch",  "nodeID", "routeAnnouncements");
-		Tuple.registerTupleType( "PathQuality",  "PathAdvertisement.id", "quality");
-		Tuple.registerTupleType( "MaxPathQuality",  "nodeID", "quality");
-		Tuple.registerTupleType( "GoodRoute",    "nodeID", "reports");
-		Tuple.registerTupleType( "RoutingLoops", "nodeID", "reports");
-		Tuple.registerTupleType( "ObservationQuality", "min", "max", "count", "ratio", "nodeID", "last");
-		Tuple.registerTupleType( "NeighbourReportsLastEpoch",  "nodeID",  "sightings");
-		Tuple.registerTupleType( "NodeRebootEvent",   "nodeID");
-		Tuple.registerTupleType( "RebootsLastEpoch", "nodeID", "reboots");
-		
-		Tuple.registerTupleType( "IDTuple", "nodeID");
-		Tuple.registerTupleType( "SeqNrTuple", "nodeID", "seqNr");
-		Tuple.registerTupleType( "PathAnnouncement",  "nodeID", "quality", "round");
-		Tuple.registerTupleType( "LinkQuality",  "advert_packet.node_id", "node_id", "quality");
-		Tuple.registerTupleType( "NodeSeen",  "reportingNode", "seenNode");
-		Tuple.registerTupleType( "PacketTracerTuple",  "l2src", "l2dst", "l3src", "l3dst", "l3seqNr");
-		Tuple.registerTupleType( "NeighbourReportsLastEpochTemp",  "seenNode",     "sightings");
-		Tuple.registerTupleType( "NeighbourSeenLastEpochTemp",     "reportingNode", "sightings");
-		Tuple.registerTupleType( "NeighbourSeenLastEpoch",     "nodeID", "sightings");
-		Tuple.registerTupleType( "NodePartitioned", "partitioned", "nodeID", "crashedNodes");
-		Tuple.registerTupleType( "NetworkPartitioned", "nodeID", "crashedNodes", "result");
-		Tuple.registerTupleType( "LinkTuple", "linkID");
-		Tuple.registerTupleType( "LinkData",  "linkID", "reports");
-		Tuple.registerTupleType( "LinkListed","linkID", "reports");
-		
-		// node state
-		Tuple.registerTupleType( "NodeReboot",   "nodeID");
-		Tuple.registerTupleType( "NodeCrash",    "nodeID");
-		Tuple.registerTupleType( "NoNeighbours", "nodeID");
-		Tuple.registerTupleType( "NoParent",     "nodeID");
-		Tuple.registerTupleType( "NodeOK",       "nodeID");
-		Tuple.registerTupleType( "RoutingFailureLoop",    "nodeID");
-		Tuple.registerTupleType( "RoutingFailureGeneral", "nodeID");
-
-		Tuple.registerTupleType( "WaitingPackets", "nodeID");
-		Tuple.registerTupleType( "WaitingNeighbours", "nodeID");
-		Tuple.registerTupleType( "WaitingPath", "nodeID");
-		Tuple.registerTupleType( "WaitingRoute", "nodeID");
-		
-	}
-
 	static final TupleAttribute bmac_src_Attribute = new TupleAttribute("bmac_msg_st.source");
 	static final TupleAttribute bmac_dst_Attribute = new TupleAttribute("bmac_msg_st.destination");
 	static final TupleAttribute seenNode_Attribute = new TupleAttribute("seenNode");
 	static final TupleAttribute nodeID_Attribute = new TupleAttribute("nodeID");
+	static final TupleAttribute node_id_Attribute = new TupleAttribute("node_id");
 	static final TupleAttribute linkID_Attribute = new TupleAttribute("linkID");
 	static final TupleAttribute reports_Attribute = new TupleAttribute("reports");
 	static final TupleAttribute routeAnnouncements_Attribute = new TupleAttribute("routeAnnouncements");
