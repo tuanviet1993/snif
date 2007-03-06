@@ -820,29 +820,15 @@ public class EWSN extends SNIFController {
 	 * TODO get away with this
 	 */
 	private static void registerTuples() {
-		Tuple.registerTupleType( "PacketTracerTuple",  "l2src", "l2dst", "l3src", "l3dst", "l3seqNr");
 
-		Tuple.registerTupleType( "PacketsLastEpoch", "nodeID", "packets");
-		Tuple.registerTupleType( "RoutesLastEpoch",  "nodeID", "routeAnnouncements");
-		Tuple.registerTupleType( "PathQuality",  "PathAdvertisement.id", "quality");
-		Tuple.registerTupleType( "MaxPathQuality",  "nodeID", "quality");
-		Tuple.registerTupleType( "GoodRoute",    "nodeID", "reports");
-		Tuple.registerTupleType( "RoutingLoops", "nodeID", "reports");
-		Tuple.registerTupleType( "ObservationQuality", "min", "max", "count", "ratio", "nodeID", "last");
-		Tuple.registerTupleType( "NeighbourReportsLastEpoch",  "nodeID",  "sightings");
-
-		Tuple.registerTupleType( "RebootsLastEpoch", "nodeID", "reboots");
-		
-		Tuple.registerTupleType( "IDTuple", "nodeID");
-		Tuple.registerTupleType( "SeqNrTuple", "nodeID", "seqNr");
-		Tuple.registerTupleType( "PathAnnouncement",  "nodeID", "quality", "round");
+		// array extractor
 		Tuple.registerTupleType( "LinkQuality",  "advert_packet.node_id", "node_id", "quality");
 		Tuple.registerTupleType( "NodeSeen",  "reportingNode", "seenNode");
-		Tuple.registerTupleType( "NeighbourReportsLastEpochTemp",  "seenNode",     "sightings");
-		Tuple.registerTupleType( "NeighbourSeenLastEpochTemp",     "reportingNode", "sightings");
-		Tuple.registerTupleType( "NeighbourSeenLastEpoch",     "nodeID", "sightings");
+
+		// network partition detection
 		Tuple.registerTupleType( "NodePartitioned", "partitioned", "nodeID", "crashedNodes");
 		Tuple.registerTupleType( "NetworkPartitioned", "nodeID", "crashedNodes", "result");
+
 		Tuple.registerTupleType( "LinkTuple", "linkID");
 		Tuple.registerTupleType( "LinkData",  "linkID", "reports");
 		Tuple.registerTupleType( "LinkListed","linkID", "reports");

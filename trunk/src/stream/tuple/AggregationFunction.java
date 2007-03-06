@@ -17,10 +17,26 @@ public abstract class AggregationFunction<P> {
 	public abstract Tuple invoke(Tuple aggregate, P value);
 
 	protected TupleAttribute aggregateField;
-	protected int tupleTypeID;
+	protected int tupleTypeID = -1;
+	protected String tupleType;
 	
 	protected AggregationFunction ( String newTupleType, String resultField) {
-		tupleTypeID = Tuple.getTupleTypeID( newTupleType);
+		tupleType = newTupleType;
 		aggregateField = new TupleAttribute(resultField);
+	}
+	
+	protected void assertType() {
+		if (tupleTypeID < 0) {
+			tupleTypeID = Tuple.getTupleTypeID( tupleType);
+		}
+	}
+	
+	protected String[] getFields(){
+		String list[] = new String [1];
+		list[0] = aggregateField.getName();
+		return list;
+	}
+	protected String getTupleType() {
+		return tupleType;
 	}
 }
