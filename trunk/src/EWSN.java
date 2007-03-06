@@ -820,7 +820,8 @@ public class EWSN extends SNIFController {
 	 * TODO get away with this
 	 */
 	private static void registerTuples() {
-		
+		Tuple.registerTupleType( "PacketTracerTuple",  "l2src", "l2dst", "l3src", "l3dst", "l3seqNr");
+
 		Tuple.registerTupleType( "PacketsLastEpoch", "nodeID", "packets");
 		Tuple.registerTupleType( "RoutesLastEpoch",  "nodeID", "routeAnnouncements");
 		Tuple.registerTupleType( "PathQuality",  "PathAdvertisement.id", "quality");
@@ -829,7 +830,7 @@ public class EWSN extends SNIFController {
 		Tuple.registerTupleType( "RoutingLoops", "nodeID", "reports");
 		Tuple.registerTupleType( "ObservationQuality", "min", "max", "count", "ratio", "nodeID", "last");
 		Tuple.registerTupleType( "NeighbourReportsLastEpoch",  "nodeID",  "sightings");
-		Tuple.registerTupleType( "NodeRebootEvent",   "nodeID");
+
 		Tuple.registerTupleType( "RebootsLastEpoch", "nodeID", "reboots");
 		
 		Tuple.registerTupleType( "IDTuple", "nodeID");
@@ -837,7 +838,6 @@ public class EWSN extends SNIFController {
 		Tuple.registerTupleType( "PathAnnouncement",  "nodeID", "quality", "round");
 		Tuple.registerTupleType( "LinkQuality",  "advert_packet.node_id", "node_id", "quality");
 		Tuple.registerTupleType( "NodeSeen",  "reportingNode", "seenNode");
-		Tuple.registerTupleType( "PacketTracerTuple",  "l2src", "l2dst", "l3src", "l3dst", "l3seqNr");
 		Tuple.registerTupleType( "NeighbourReportsLastEpochTemp",  "seenNode",     "sightings");
 		Tuple.registerTupleType( "NeighbourSeenLastEpochTemp",     "reportingNode", "sightings");
 		Tuple.registerTupleType( "NeighbourSeenLastEpoch",     "nodeID", "sightings");

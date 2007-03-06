@@ -6,6 +6,8 @@ import stream.AbstractPipe;
 
 public class SeqNrResetDetector extends AbstractPipe<Tuple, Tuple> {
 
+	private static final String NODE_REBOOT_EVENT = "NodeRebootEvent";
+	
 	int maxSeqNq;
 	int expectOverrun;
 	int overrunBuffer;
@@ -14,13 +16,14 @@ public class SeqNrResetDetector extends AbstractPipe<Tuple, Tuple> {
 	
 	HashMap<Object, Integer> nodes = new HashMap<Object, Integer>();
 
+	
 	public void process(Tuple o, int srcID, long timestamp) {
 		Object nodeID = o.getAttribute(idFieldID);
 		int currentSeqNr = o.getIntAttribute(seqNrFieldID);
 		Integer lastSeqNr = nodes.get(nodeID);
 		if (lastSeqNr != null) { 
 			if ( currentSeqNr < lastSeqNr && currentSeqNr < expectOverrun) {
-				Tuple tuple = Tuple.createTuple("NodeRebootEvent");
+				Tuple tuple = Tuple.createTuple(NODE_REBOOT_EVENT);
 				tuple.setAttribute(idFieldID, nodeID);
 				transfer( tuple, timestamp);
 			} else {
@@ -34,5 +37,6 @@ public class SeqNrResetDetector extends AbstractPipe<Tuple, Tuple> {
 		seqNrFieldID = new TupleAttribute(seqNrField);
 		this.maxSeqNq = maxSeqNq;
 		this.expectOverrun = maxSeqNq - expectOverrun;
-	}
+
+		Tuple.registerTupleType( NODE_REBOOT_EVENT,  idField);	}
 }

@@ -1,9 +1,6 @@
 package stream.tuple;
 
 public class Counter extends AggregationFunction<Tuple> {
-	private TupleAttribute aggregateField;
-	private int tupleTypeID;
-	
 	//  ... "packets" "PacketsLastEpoch" 
 	public Tuple invoke(Tuple aggregate, Tuple value) {
 		if (aggregate == null) {
@@ -16,7 +13,6 @@ public class Counter extends AggregationFunction<Tuple> {
 		}
 	}
 	public Counter( String newTupleType, String resultField) {
-		tupleTypeID = Tuple.getTupleTypeID( newTupleType);
-		aggregateField = new TupleAttribute(resultField);
+		super(newTupleType, resultField);
 	}
 }

@@ -15,4 +15,12 @@ package stream.tuple;
 
 public abstract class AggregationFunction<P> {
 	public abstract Tuple invoke(Tuple aggregate, P value);
+
+	protected TupleAttribute aggregateField;
+	protected int tupleTypeID;
+	
+	protected AggregationFunction ( String newTupleType, String resultField) {
+		tupleTypeID = Tuple.getTupleTypeID( newTupleType);
+		aggregateField = new TupleAttribute(resultField);
+	}
 }
