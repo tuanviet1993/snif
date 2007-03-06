@@ -85,6 +85,7 @@ public class Tuple {
 					throw new RuntimeException("Tuple "+type+" registered twice with different fields. New registration lacks field "+attribute.getName());
 				}
 			}
+			return oldTupleID;
 		}
 		// assert all fields are registered
 		if (registeredAttributeNames.size() == 0) {

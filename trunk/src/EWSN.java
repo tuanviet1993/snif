@@ -825,10 +825,7 @@ public class EWSN extends SNIFController {
 		Tuple.registerTupleType( "LinkQuality",  "advert_packet.node_id", "node_id", "quality");
 		Tuple.registerTupleType( "NodeSeen",  "reportingNode", "seenNode");
 
-		// network partition detection
-		Tuple.registerTupleType( "NodePartitioned", "partitioned", "nodeID", "crashedNodes");
-		Tuple.registerTupleType( "NetworkPartitioned", "nodeID", "crashedNodes", "result");
-
+		// ??
 		Tuple.registerTupleType( "LinkTuple", "linkID");
 		Tuple.registerTupleType( "LinkData",  "linkID", "reports");
 		Tuple.registerTupleType( "LinkListed","linkID", "reports");

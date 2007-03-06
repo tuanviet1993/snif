@@ -57,17 +57,17 @@ public class NetworkPartitionDetection extends AbstractPipe<Tuple,Tuple> impleme
 
 	TupleChangePredicate tupleChangePredicate;
 
-	int partionedTupleID = Tuple.getTupleTypeID("NodePartitioned");
+	int partionedTupleID;
 
-	TupleAttribute nodeIDID = new TupleAttribute("nodeID");
-
-	TupleAttribute partitionedID = new TupleAttribute("partitioned");
+	TupleAttribute nodeIDID;
 	
-	TupleAttribute crashedNodesIDs = new TupleAttribute("crashedNodes");
-
-	TupleAttribute l2srcAttribute = new TupleAttribute("l2src");
+	TupleAttribute partitionedID;
 	
-	TupleAttribute l2dstAttribute = new TupleAttribute("l2dst");
+	TupleAttribute crashedNodesIDs;
+
+	TupleAttribute l2srcAttribute;
+	
+	TupleAttribute l2dstAttribute;
 
 	public long timeUsedNano = 0;
 
@@ -87,6 +87,14 @@ public class NetworkPartitionDetection extends AbstractPipe<Tuple,Tuple> impleme
 		this.metricPeriod = metricPeriod;
 		this.nodeStateChangeSrcID = nodeStateChangeSrcID;
 		this.packetTracerSrcID = packetTracerSrcID;
+		
+		partionedTupleID = Tuple.registerTupleType( "NodePartitioned", "partitioned", "nodeID", "crashedNodes");
+		nodeIDID = new TupleAttribute("nodeID");
+		partitionedID = new TupleAttribute("partitioned");
+		crashedNodesIDs = new TupleAttribute("crashedNodes");
+		l2srcAttribute = new TupleAttribute("l2src");
+		l2dstAttribute = new TupleAttribute("l2dst");		
+		
 	}
 
 	/** 
