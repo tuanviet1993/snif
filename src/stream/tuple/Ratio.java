@@ -8,8 +8,6 @@ package stream.tuple;
  * result is a Double attribute
  */
 public class Ratio extends AggregationFunction<Tuple> {
-	private int tupleTypeID;
-	private TupleAttribute ratioID;
 	private TupleAttribute maxID;
 	private TupleAttribute minID;
 	private TupleAttribute seqNrID;
@@ -19,7 +17,7 @@ public class Ratio extends AggregationFunction<Tuple> {
 	public Tuple invoke(Tuple aggregate, Tuple value) {
 		if (aggregate == null) {
 			aggregate = Tuple.createTuple(tupleTypeID);
-			aggregate.setAttribute(ratioID, 0.0);
+			aggregate.setAttribute(aggregateField, 0.0);
 			aggregate.setIntAttribute(countID, 0);
 			aggregate.setIntAttribute(lastID, -1);
 		} else {
@@ -38,7 +36,7 @@ public class Ratio extends AggregationFunction<Tuple> {
 			if ( aggregate.getAttribute(maxID) == null) {
 				aggregate.setIntAttribute( maxID, aValue);
 				aggregate.setIntAttribute( minID, aValue);
-				aggregate.setAttribute(ratioID, 0f);
+				aggregate.setAttribute(aggregateField, 0f);
 			} else {
 				if ( aggregate.getIntAttribute(maxID) < aValue) {
 					aggregate.setIntAttribute( maxID, aValue);
@@ -51,13 +49,13 @@ public class Ratio extends AggregationFunction<Tuple> {
 			aggregate.setIntAttribute(lastID, aValue);
 			// result: offset difference by one: {1} => 1.0, {1,2} => 1.0 
 			Double ratio = ((double) count / (aggregate.getIntAttribute(maxID) - aggregate.getIntAttribute(minID) + 1.0));
-			aggregate.setAttribute(ratioID, ratio );
+			aggregate.setAttribute(aggregateField, ratio );
 		}
 		return aggregate;
 	}
 	public Ratio( String newTupleType, String seqNrField ) {
-		tupleTypeID = Tuple.getTupleTypeID( newTupleType);
-		ratioID = new TupleAttribute("ratio");
+		super (newTupleType, "ratio");
+		
 		seqNrID = new TupleAttribute(seqNrField);
 		countID = new TupleAttribute("count");
 		minID = new TupleAttribute("min");

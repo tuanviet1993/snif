@@ -21,6 +21,8 @@ import stream.Predicate;
 
 public class DistinctInWindow extends Predicate<PacketTuple> {
 
+	private int maxTimeBetweenDups = -1;
+	
 	private LinkedList<PacketTuple> window = new LinkedList<PacketTuple>();
 	
 	private int duplicate_timeout;
@@ -51,6 +53,12 @@ public class DistinctInWindow extends Predicate<PacketTuple> {
 
 		// contained in window?
 		if (window.contains(p)) {
+			PacketTuple old = window.get( window.indexOf(p));
+			long delta = p.time_ms - old.time_ms;
+			if (delta > maxTimeBetweenDups) {
+				maxTimeBetweenDups = (int) (delta);
+			}
+			System.out.println("Dup, time="+delta+", max="+maxTimeBetweenDups+" old_t "+old.time_ms + ", new_t "+p.time_ms);
 			return false;
 		}
 

@@ -41,6 +41,8 @@ public class PacketTupleTracer extends AbstractPipe<Tuple, Tuple> {
 		
 		tracer = PacketTracer.getPacketTracer();
 		PacketTracer.discardCachedPacket();
+
+		Tuple.registerTupleType( "PacketTracerTuple",  "l2src", "l2dst", "l3src", "l3dst", "l3seqNr");
 	}
 
 	public void process(Tuple inTuple, int srcID, long timestamp) {
