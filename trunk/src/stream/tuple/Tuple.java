@@ -59,7 +59,32 @@ public class Tuple {
 	
 	public static int registerTupleType( String type, String... fields) {
 		if (registeredTuples.containsKey(type)) {
-			throw new RuntimeException("Tuple "+type+" registered twice");
+			// compare
+			int oldTupleID = registeredTuples.get( type );
+			TupleType oldTuple = tuplesList.get( oldTupleID);
+			// check, if attribues match
+			for (String field : fields ) {
+				// check if 
+				int fieldID = getAttributeId( field );
+				if (oldTuple.id2field[fieldID] < 0) {
+					throw new RuntimeException("Tuple "+type+" registered twice with different fields. Previous registration lacks field "+field);
+				}
+			}
+			for (TupleAttribute attribute : oldTuple.fieldAttributes) {
+				if (attribute.getName().equals("TupleType")) {
+					continue;
+				}
+				boolean found = false;
+				for (String field : fields ) {
+					if (attribute.getName().equals(field)) {
+						found = true;
+						break;
+					}
+				}
+				if (!found) {
+					throw new RuntimeException("Tuple "+type+" registered twice with different fields. New registration lacks field "+attribute.getName());
+				}
+			}
 		}
 		// assert all fields are registered
 		if (registeredAttributeNames.size() == 0) {
