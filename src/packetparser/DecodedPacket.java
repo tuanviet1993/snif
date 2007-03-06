@@ -44,7 +44,10 @@ public class DecodedPacket {
     }
     
     public int getByte( int offset) {
-    	if (rawData[offset] >= 0) return rawData[offset];
+    	if (offset >= rawData.length) {
+    		System.out.println("DecodedPacket error: access byte "+offset+" in\n"+toString());
+    		System.exit(10);
+    	}    	if (rawData[offset] >= 0) return rawData[offset];
     	return rawData[offset]+256;
     }
     

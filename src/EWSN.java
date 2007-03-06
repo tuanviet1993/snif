@@ -155,7 +155,6 @@ public class EWSN extends SNIFController {
 		setNodePositions();
 		
 		parser = Parser.readDescription(PACKETDEFINITION);
-		registerTuples();
 		// parser.dumpDescription();
 	}
 
@@ -220,7 +219,7 @@ public class EWSN extends SNIFController {
 
 			// translate LinkAdvertisementBeacons into Neighbour sightings
 			ArrayExtractor linkAdvertisementExtractor = new ArrayExtractor( "LinkQuality",
-					"advert_packet.neighbours.length", "advert_packet.neighbours");
+					"advert_packet.neighbours.length", "advert_packet.neighbours", "advert_packet.node_id", "node_id", "quality");
 			linkAdvertisementFilter.subscribe( linkAdvertisementExtractor, 0);
 
 			// ignore empty entries
@@ -480,6 +479,7 @@ public class EWSN extends SNIFController {
 			// packetTupleMapper.subscribe(logger, 0);		
 
 			// map "from", "to" -> "linkID=from#to
+			Tuple.registerTupleType( "LinkTuple", "linkID");
 			AbstractPipe<Tuple,Tuple> linkEnumeratorNeighbours = new AbstractPipe<Tuple,Tuple>() {
 				final TupleAttribute idField = new TupleAttribute("linkID");
 				final TupleAttribute fromAttribute = new TupleAttribute("reportingNode");
@@ -814,24 +814,6 @@ public class EWSN extends SNIFController {
 			} catch (IOException e) { /** */}
 		}
 	}
-
-	/**
-	 * 
-	 * TODO get away with this
-	 */
-	private static void registerTuples() {
-
-		// array extractor
-		Tuple.registerTupleType( "LinkQuality",  "advert_packet.node_id", "node_id", "quality");
-		Tuple.registerTupleType( "NodeSeen",  "reportingNode", "seenNode");
-
-		// ??
-		Tuple.registerTupleType( "LinkTuple", "linkID");
-		Tuple.registerTupleType( "LinkData",  "linkID", "reports");
-		Tuple.registerTupleType( "LinkListed","linkID", "reports");
-		
-	}
-
 	
 	static final TupleAttribute bmac_src_Attribute = new TupleAttribute("bmac_msg_st.source");
 	static final TupleAttribute bmac_dst_Attribute = new TupleAttribute("bmac_msg_st.destination");

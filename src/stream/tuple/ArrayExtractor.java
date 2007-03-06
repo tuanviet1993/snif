@@ -15,7 +15,7 @@ public class ArrayExtractor extends AbstractPipe<Tuple, Tuple> {
 	TupleAttribute memberIDs[];
 	int nrMappings;
 	TupleType prototype;
-	private TupleAttribute tupleTypeFieldID;
+	private TupleAttribute tupleTypeID;
 	
 	public void process(Tuple o, int srcID, long timestamp) {
 		PacketTuple packet = (PacketTuple) o;
@@ -26,7 +26,7 @@ public class ArrayExtractor extends AbstractPipe<Tuple, Tuple> {
 				TupleAttribute aField = prototype.fieldAttributes[i];
 				if ( !aField.equals(sizeField)  &&
 					 !aField.equals(arrayField) && 
-					 !aField.equals(tupleTypeFieldID) ) {
+					 !aField.equals(tupleTypeID) ) {
 					String path = arrayField.getName() + "[" + itemNr+"]."+aField.getName();
 					if ( ((PacketTuple) o).exists(path) ) {
 						newTuple.setAttribute( aField, packet.getAttribute( path ));
@@ -39,12 +39,26 @@ public class ArrayExtractor extends AbstractPipe<Tuple, Tuple> {
 			transfer( newTuple, timestamp );
 		}
 	}
+	
 	public ArrayExtractor(String newType, String arraySize, String arrayField) {
 		this.newType = Tuple.getTupleTypeID(newType);
 		prototype = Tuple.createTuple(this.newType).getPrototype(); 
 		
-		tupleTypeFieldID = new TupleAttribute("TupleType");
+		tupleTypeID = new TupleAttribute("TupleType");
 		this.arrayField = new TupleAttribute(arrayField);
 		sizeField = new TupleAttribute(arraySize);
+	}
+
+	public ArrayExtractor(String newType, String arraySize, String arrayField, String ... mapped)  {
+
+		Tuple.registerTupleType(newType, mapped);
+
+		this.newType = Tuple.getTupleTypeID(newType);
+		prototype = Tuple.createTuple(this.newType).getPrototype(); 
+		
+		tupleTypeID = new TupleAttribute("TupleType");
+		this.arrayField = new TupleAttribute(arrayField);
+		sizeField = new TupleAttribute(arraySize);
+		
 	}
 }
