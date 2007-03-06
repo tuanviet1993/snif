@@ -7,6 +7,7 @@ public class MaxDiff extends AggregationFunction<Tuple> {
 	private TupleAttribute minAttr;
 	
 	public Tuple invoke(Tuple aggregate, Tuple value) {
+		assertType();
 		int aValue = (Integer) value.getAttribute(aggregateField);
 		if (aggregate == null) {
 			aggregate = Tuple.createTuple(tupleTypeID);

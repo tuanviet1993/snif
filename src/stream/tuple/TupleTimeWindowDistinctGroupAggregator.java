@@ -13,7 +13,7 @@ TimeWindowDistinctGroupAggregator<Tuple, Object, Object, Tuple> {
 
 	protected AggregationFunction<Tuple> aggregator;
 	protected TupleAttribute groupFieldID;
-	protected TupleAttribute[] distinctFieldID;
+	protected TupleAttribute[] distinctFields;
 	
 	Function<Tuple,Object> fieldGrouper = new Function<Tuple,Object>() {
 		public Object invoke(Tuple argument) {
@@ -22,12 +22,12 @@ TimeWindowDistinctGroupAggregator<Tuple, Object, Object, Tuple> {
 	};
 	Function<Tuple,Object> fieldsDistincter = new Function<Tuple,Object>(){
 		public Object invoke(Tuple argument) {
-			if (distinctFieldID.length == 1) {
-				return ( "" + argument.getAttribute(distinctFieldID[0])).hashCode();
+			if (distinctFields.length == 1) {
+				return ( "" + argument.getAttribute(distinctFields[0])).hashCode();
 			} else {
 				StringBuffer hashWord = new StringBuffer();
-				for (int i = 0; i<distinctFieldID.length; i++) {
-					hashWord.append( ""+ argument.getAttribute(distinctFieldID[i]));
+				for (int i = 0; i<distinctFields.length; i++) {
+					hashWord.append( ""+ argument.getAttribute(distinctFields[i]));
 					hashWord.append( "#" );
 				}
 				// System.out.println("Tuple" + argument + ". Key: "+hashWord);
@@ -43,15 +43,20 @@ TimeWindowDistinctGroupAggregator<Tuple, Object, Object, Tuple> {
 			String... distinctFields ){
 		
 		super();
-		this.timewindow = timewindow;
+		
+		this.distinctFields = new TupleAttribute[distinctFields.length];
+		for (int i=0; i<distinctFields.length; i++) {
+			this.distinctFields[i] = new TupleAttribute(distinctFields[i]);
+		}
+
 		this.distincter = fieldsDistincter;
+		
+		this.timewindow = timewindow;
 		this.grouper = fieldGrouper;
 		this.aggregator = aggregator;
 		this.groupFieldID = new TupleAttribute( groupField);
-		distinctFieldID = new TupleAttribute[distinctFields.length];
-		for (int i=0; i<distinctFields.length; i++) {
-			this.distinctFieldID[i] = new TupleAttribute(distinctFields[i]);
-		}
+		
+		registerType();
 	}
 	
 	public TupleTimeWindowDistinctGroupAggregator(
@@ -60,12 +65,16 @@ TimeWindowDistinctGroupAggregator<Tuple, Object, Object, Tuple> {
 			Function <Tuple, ?> grouper,
 			String groupField,
 			AggregationFunction<Tuple> aggregator) {
+
 		super();
+
 		this.timewindow = timewindow;
 		this.distincter = distincter;
 		this.grouper    = grouper;
 		this.aggregator = aggregator;
 		this.groupFieldID = new TupleAttribute( groupField);
+		
+		registerType();
 	}
 
 	/**
@@ -90,4 +99,12 @@ TimeWindowDistinctGroupAggregator<Tuple, Object, Object, Tuple> {
 		transfer( aggregate, timestamp);
 	}
 
+	protected void registerType() {
+		String[] aggregateFields = aggregator.getFields();
+		String tupleType = aggregator.getTupleType();
+		String [] allAttributes = new String[aggregateFields.length+1];
+		allAttributes[0] = groupFieldID.getName();
+		System.arraycopy(aggregateFields, 0, allAttributes, 1, aggregateFields.length);
+		Tuple.registerTupleType(tupleType, allAttributes);
+	}
 }

@@ -23,6 +23,7 @@ public class TupleTimeWindowGroupAggregator extends TimeWindowGroupAggregator<Tu
 		this.aggregator = aggregator;
 		this.groupField = groupField;
 		this.groupFieldID = new TupleAttribute( groupField);
+		registerType();
 	}
 
 	public TupleTimeWindowGroupAggregator(int timewindow, String groupField, AggregationFunction<Tuple> aggregator, String name) {
@@ -31,6 +32,7 @@ public class TupleTimeWindowGroupAggregator extends TimeWindowGroupAggregator<Tu
 		this.groupFieldID = new TupleAttribute( groupField);
 		this.aggregator = aggregator;
 		this.grouper = fieldGrouper;
+		registerType();
 	}
 	
 	/**
@@ -51,4 +53,13 @@ public class TupleTimeWindowGroupAggregator extends TimeWindowGroupAggregator<Tu
 		transfer( aggregate, timestamp);
 	}
 
+	protected void registerType() {
+		String[] aggregateFields = aggregator.getFields();
+		String tupleType = aggregator.getTupleType();
+		String [] allAttributes = new String[aggregateFields.length+1];
+		allAttributes[0] = groupFieldID.getName();
+		System.arraycopy(aggregateFields, 0, allAttributes, 1, aggregateFields.length);
+		Tuple.registerTupleType(tupleType, allAttributes);
+	}
 }
+
