@@ -833,20 +833,6 @@ public class EWSN extends SNIFController {
 		Tuple.registerTupleType( "LinkData",  "linkID", "reports");
 		Tuple.registerTupleType( "LinkListed","linkID", "reports");
 		
-		// node state
-		Tuple.registerTupleType( "NodeReboot",   "nodeID");
-		Tuple.registerTupleType( "NodeCrash",    "nodeID");
-		Tuple.registerTupleType( "NoNeighbours", "nodeID");
-		Tuple.registerTupleType( "NoParent",     "nodeID");
-		Tuple.registerTupleType( "NodeOK",       "nodeID");
-		Tuple.registerTupleType( "RoutingFailureLoop",    "nodeID");
-		Tuple.registerTupleType( "RoutingFailureGeneral", "nodeID");
-		Tuple.registerTupleType( "NotCovert", "nodeID");
-
-		Tuple.registerTupleType( "WaitingPackets", "nodeID");
-		Tuple.registerTupleType( "WaitingNeighbours", "nodeID");
-		Tuple.registerTupleType( "WaitingPath", "nodeID");
-		Tuple.registerTupleType( "WaitingRoute", "nodeID");
 	}
 
 	
