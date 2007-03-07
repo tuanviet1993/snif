@@ -196,7 +196,15 @@ public class DecodedPacket {
     	// print own
     	for (Attribute att : template.getAttributes()) {
     		if (!att.name.equals(nested)) {
-    			result.append( att.name + " = " + template.getInt(rawData, att) + ";\n");
+    			if (att.type.elements > 1) {
+    				for (int idx = 0; idx<att.type.elements; idx++) {
+        				result.append( att.name + "["+idx+"] = "+ template.getInt(rawData, att) + ";\n");
+        				// check for struct / non-struct
+    				}
+    			} else {
+    				// check for struct / non-struct
+    				result.append( att.name + " = " + template.getInt(rawData, att) + ";\n");
+    			}
     		}
     	}
     	result.append("\n");
