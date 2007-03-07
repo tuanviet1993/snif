@@ -84,7 +84,7 @@ public class DetectionAlgoTuple {
 		// path = basePath + "dsn-07"; 					// single node crash experiment, p=6
 		// path = basePath + "dsn-block01/"; 			// blocking experiment, p=6
 		// path = basePath + "dsn-block02/"; 			// blocking experiment, p=4
-		path = "dsn-ok01/"; 				// no crash, p=1-6
+		path = basePath + "dsn-ok01/"; 				// no crash, p=1-6
 		// path = basePath + "dsn-ok02-newPositions/";	// no crash, p=4, new positions
 		// path = "/Volumes/MRINGWAL/Simulations/dsn-partition11-4to16/";	// network partition, p=4, 4-16 crashed
 		// path = basePath + "dsn-partition12/";		// network partition, p=4, 4-16 crashed
