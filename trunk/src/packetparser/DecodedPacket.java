@@ -1,5 +1,7 @@
 package packetparser;
 
+import java.util.Vector;
+
 public class DecodedPacket {
 
     // String type;
@@ -177,6 +179,38 @@ public class DecodedPacket {
     	return template.typeName + " " + result.toString();
     }
 
+    private void dumpStruct( StringBuffer result, PacketTemplate template, PacketTemplate subtype) {
+    	
+    	if (template.parent != null) {
+    		// print parent first
+    		dumpStruct( result, template.parent, template );
+    	}
+ 
+    	// figure out, which one is parent 
+    	String nested = null;
+    	if (subtype != null) {
+    		nested = subtype.expands.name;
+    	}
+    	result.append( template.getTypeName()+":\n");
+    	
+    	// print own
+    	for (Attribute att : template.getAttributes()) {
+    		if (!att.name.equals(nested)) {
+    			result.append( att.name + " = " + template.getInt(rawData, att) + ";\n");
+    		}
+    	}
+    	result.append("\n");
+    }
+    
+    public String toStringPretty() {
+    	StringBuffer result = new StringBuffer();
+    	// get root
+    	result.append( " {\n");
+    	dumpStruct(result, template, null);
+    	result.append( "}\n");
+    	return result.toString();
+    }
+    
 	public boolean exists(String attribute) {
 		return  getIntAttribute(template, 0, attribute) != null;
 	}

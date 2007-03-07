@@ -53,4 +53,8 @@ public class TypeSpecifier {
 	public static void setEndianess(boolean littleEndian ) {
 		TypeSpecifier.littleEndian = littleEndian;
 	}
+
+	public String getTypeName() {
+		return typeName;
+	}
 }

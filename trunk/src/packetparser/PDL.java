@@ -119,7 +119,7 @@ public class PDL {
 		}
 	}
 
-	PacketTemplate getDefaultPacket() {
+	public PacketTemplate getDefaultPacket() {
 		
 		String defPackName = getStringValue("defaults.packet");
 		return structs.get(defPackName);

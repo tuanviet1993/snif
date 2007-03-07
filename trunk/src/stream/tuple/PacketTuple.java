@@ -62,6 +62,11 @@ public class PacketTuple extends Tuple implements ITimeStampedObject {
 	public String toString() {
 		return packet.toString();
 	}
+
+	public String toStringPretty() {
+		return packet.toStringPretty();
+	}
+	
 	public boolean equals( Object obj) {
 		if (! (obj instanceof PacketTuple)) return false;
 		return packet.equals( ((PacketTuple) obj).packet);

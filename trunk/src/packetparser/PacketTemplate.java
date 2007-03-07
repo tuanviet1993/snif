@@ -255,7 +255,6 @@ public class PacketTemplate extends TypeSpecifier {
 			offset += step;
 			size--;
 		}
-		// TODO: add signedness
 		return value;
 	}
 
@@ -301,6 +300,10 @@ public class PacketTemplate extends TypeSpecifier {
 			result[i++] = att.name;
 		}
 		return result;
+	}
+
+	public Vector<Attribute> getAttributes() {
+		return attributes;
 	}
 }
 
