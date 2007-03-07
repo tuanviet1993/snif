@@ -1,5 +1,7 @@
 
 
+import dsn.DSNConnector;
+import edu.uci.ics.jung.visualization.Coordinates;
 import gui.SNIFController;
 import gui.View;
 
@@ -10,10 +12,8 @@ import java.text.NumberFormat;
 import java.util.HashMap;
 
 import model.NodeAddress;
-import packetparser.DecodedPacket;
 import packetparser.PDL;
 import packetparser.Parser;
-import packetparser.PhyConfig;
 import stream.AbstractPipe;
 import stream.AbstractSink;
 import stream.AbstractSource;
@@ -32,6 +32,7 @@ import stream.tuple.GroupingEvaluator;
 import stream.tuple.LogReader;
 import stream.tuple.Mapper;
 import stream.tuple.NetworkPartitionDetection;
+import stream.tuple.PacketCrcPredicate;
 import stream.tuple.PacketTuple;
 import stream.tuple.PacketTupleTracer;
 import stream.tuple.Ratio;
@@ -43,8 +44,6 @@ import stream.tuple.TupleAttribute;
 import stream.tuple.TupleChangePredicate;
 import stream.tuple.TupleTimeWindowDistinctGroupAggregator;
 import stream.tuple.TupleTimeWindowGroupAggregator;
-import dsn.DSNConnector;
-import edu.uci.ics.jung.visualization.Coordinates;
 
 /**
  * Detection Algo Implementation based on generic tuple processing
@@ -108,38 +107,7 @@ public class EWSN extends SNIFController {
 		};
 		return packetLogger;
 	}
-	
-	/**
-	 * @param parser
-	 * @return
-	 */
-	public static Predicate<PacketTuple> createCRCFilter(final PDL parser) {
-		// crc check: remove packets with wrong CRC
-		Predicate<PacketTuple> crcCheck = new Predicate<PacketTuple>() {
-			final PhyConfig phyConfig = parser.getSnifferConfig();
-			public boolean invoke(PacketTuple o, long timestamp) {
-				int crcInPacket = o.getIntAttribute("bmac_msg_st.crc");
-			    DecodedPacket packet = o.getPacket();
-			    int crcPos = phyConfig.CRCpos;
-			    if (!phyConfig.fixedSize){
-			    	crcPos += packet.getByte(phyConfig.lengthPos) + phyConfig.lengthOffset;
-			    }
-			    // check valid packet size
-			    if (crcPos > packet.getLength()) {
-			    	return false;
-			    }
-			    int crc = 0xffff;
-			    for (int pos=0; pos < crcPos ; pos++ ){
-			    	int data = packet.getByte(pos);
-			        data ^= crc & 0xff;
-			        data ^= (data << 4) & 0xff;
-			        crc = (((data << 8) | (crc >> 8)) ^ (data >> 4) ^ (data << 3) ) &0xffff;
-			    }
-			    return (crcInPacket == crc);
-			}
-		};
-		return crcCheck;
-	}
+
 
 	// used to signal run queue
 	private static FileWriter dsnLogWriter;	
@@ -174,7 +142,7 @@ public class EWSN extends SNIFController {
 		while (true) {
 
 			// create crc filter
-			Predicate<PacketTuple> crcCheck = createCRCFilter(parser);
+			Predicate<PacketTuple> crcCheck = new PacketCrcPredicate(parser);
 			Filter<PacketTuple> crcFilter = new Filter<PacketTuple>( crcCheck ); 
 
 			// total bandwith aggregator
