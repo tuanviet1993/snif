@@ -44,7 +44,7 @@ public class LogReader extends AbstractSource<PacketTuple> {
 		if (packet == null) return null;
 		byte[] rawData = new byte[packet.len];
 		System.arraycopy(packet.data, 0, rawData, 0, packet.len);
-		PacketTuple packetTuple = new PacketTuple( parser.decodePacketNew( rawData ), packet.timestamp);
+		PacketTuple packetTuple = new PacketTuple( parser.decodePacket( rawData ), packet.timestamp);
 		packetTuple.setDsnNode(packet.dsnNode);
 		return packetTuple;
 	}

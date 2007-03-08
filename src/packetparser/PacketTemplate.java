@@ -119,6 +119,50 @@ public class PacketTemplate extends TypeSpecifier {
 		}
 		return null;
 	}
+	PacketTemplate getSuper() {
+		if (parent != null)
+			return parent;
+		return this;
+	}
+
+	public int getInt(byte buffer[], int offset, int size, boolean littleEndian) {
+		if (offset + size > buffer.length)
+			return -1;
+
+		int step = 1;
+		if (littleEndian) {
+			offset += size - 1;
+			step = -1;
+		}
+		int value = 0;
+		while (size > 0) {
+			int currByte = buffer[offset];
+			if (currByte < 0) {
+				currByte += 256;
+			}
+			value = (value << 8) + currByte;
+			offset += step;
+			size--;
+		}
+		return value;
+	}
+
+
+	
+	public String [] getAttributeNames(){
+		String [] result = new String[ attributes.size()];
+		int i=0;
+		for (Attribute att : this.attributes) {
+			result[i++] = att.name;
+		}
+		return result;
+	}
+
+	public Vector<Attribute> getAttributes() {
+		return attributes;
+	}
+
+	/******** toString *****/
 	
 	/**
 	 * return PacketTemplate as C struct
@@ -225,85 +269,5 @@ public class PacketTemplate extends TypeSpecifier {
 		return result.toString();
 	}
 
-	PacketTemplate getSuper() {
-		if (parent != null)
-			return parent;
-		return this;
-	}
-
-	int getInt(byte buffer[], Attribute attribute) {
-		return getInt(buffer, attribute.offset, attribute.type.size,
-				TypeSpecifier.littleEndian);
-	}
-
-	public int getInt(byte buffer[], int offset, int size, boolean littleEndian) {
-		if (offset + size > buffer.length)
-			return -1;
-
-		int step = 1;
-		if (littleEndian) {
-			offset += size - 1;
-			step = -1;
-		}
-		int value = 0;
-		while (size > 0) {
-			int currByte = buffer[offset];
-			if (currByte < 0) {
-				currByte += 256;
-			}
-			value = (value << 8) + currByte;
-			offset += step;
-			size--;
-		}
-		return value;
-	}
-
-	String parseByteArray(byte buffer[], int byteOffset, String prefix) {
-		// parse parent (extension)
-		String postfix = typeName;
-		if (parent != null) {
-			postfix = parent.parseByteArray(buffer, byteOffset, prefix) + "."
-					+ typeName;
-		}
-		// add prefix 
-		if (!prefix.equals(""))
-			postfix = prefix + "." + postfix;
-
-		for (Attribute att : this.attributes) {
-			if (att.type instanceof PacketTemplate) {
-				// ((PacketTemplate) att.type).parseByteArray( buffer, att.offset + byteOffset , prefix + "." + att.name);
-				((PacketTemplate) att.type).parseByteArray(buffer, att.offset
-						+ byteOffset, postfix + "." + att.name);
-			} else {
-				// all information available.. do something with it
-				// System.out.println( prefix + "." + att.name + ": " + (byteOffset + att.offset) + ", " + (att.elements) + " * " + (att.type.size)); 
-				System.out.print(postfix + "." + att.name + ": "
-						+ (byteOffset + att.offset) + ", " + (att.elements)
-						+ " * " + (att.type.size));
-				System.out.print("{");
-				for (int i = 0; i < att.elements; i++) {
-					int value = getInt(buffer, byteOffset + att.offset + i
-							* att.type.size, att.type.size,
-							TypeSpecifier.littleEndian);
-					System.out.print(" " + value);
-				}
-				System.out.println("}");
-			}
-		}
-		return postfix;
-	}
-	
-	public String [] getAttributeNames(){
-		String [] result = new String[ attributes.size()];
-		int i=0;
-		for (Attribute att : this.attributes) {
-			result[i++] = att.name;
-		}
-		return result;
-	}
-
-	public Vector<Attribute> getAttributes() {
-		return attributes;
-	}
 }
 

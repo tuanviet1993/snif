@@ -206,7 +206,9 @@ public class PDL {
 			if (child.guardField == null) {
 				return getNestedPacketTemplate(buffer,child);
 			}
-			if ( child.getInt(buffer, child.guardField) == child.guardValue) {
+			Attribute attribute = child.guardField;
+			if ( child.getInt(buffer, attribute.offset, attribute.type.size,
+			TypeSpecifier.littleEndian) == child.guardValue) {
 				// System.out.println("getNestedPacketTemplate: "+packet.typeName+" is a " + child.typeName);
 				return getNestedPacketTemplate(buffer, child);
 			}
@@ -219,12 +221,7 @@ public class PDL {
 		return getNestedPacketTemplate(buffer, defPacket);
 	}
 	
-	public void decodePacket( byte[] buffer) {
-		PacketTemplate packet = getPacketTemplate(buffer);
-		packet.parseByteArray( buffer, 0, "" );
-	}
-	
-	public DecodedPacket decodePacketNew( byte[] buffer) {
+	public DecodedPacket decodePacket( byte[] buffer) {
 		PacketTemplate packet = getPacketTemplate(buffer);
 		if (packet == null) return null;
 		return new DecodedPacket( buffer, packet);
@@ -316,7 +313,7 @@ public class PDL {
 		byte [] packetRaw = { 0, 0, 2, 0, 11,   0, 0,   0, 0, 0,   0, 0, 0,  0, 0, 0 };
 		PDL parser = readDescription( "packetdefinitions/ewsn07.h");
 		parser.dumpDescription();
-		DecodedPacket packet = parser.decodePacketNew(packetRaw);
+		DecodedPacket packet = parser.decodePacket(packetRaw);
 		System.out.print( packet );
 	}
 }
