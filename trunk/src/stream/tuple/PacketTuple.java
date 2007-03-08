@@ -98,4 +98,5 @@ public class PacketTuple extends Tuple implements ITimeStampedObject {
 	public byte [] getRaw(){
 		return packet.getRaw();
 	}
+
 }

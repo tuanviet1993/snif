@@ -120,7 +120,6 @@ public class PDL {
 	}
 
 	public PacketTemplate getDefaultPacket() {
-		
 		String defPackName = getStringValue("defaults.packet");
 		return structs.get(defPackName);
 	}
@@ -196,37 +195,6 @@ public class PDL {
 		config.printConfig();
 	}
 
-	public PacketTemplate getPacketTemplate(String name) {
-		return structs.get(name);
-	}
-	
-	public PacketTemplate getNestedPacketTemplate( byte[] buffer, PacketTemplate packet) {
-		for (PacketTemplate child : packet.extensions ) {
-			// check for conditions 
-			if (child.guardField == null) {
-				return getNestedPacketTemplate(buffer,child);
-			}
-			Attribute attribute = child.guardField;
-			if ( DecodedPacket.getInt(buffer, attribute.offset, attribute.type.size,
-			TypeSpecifier.littleEndian) == child.guardValue) {
-				// System.out.println("getNestedPacketTemplate: "+packet.typeName+" is a " + child.typeName);
-				return getNestedPacketTemplate(buffer, child);
-			}
-		}
-		return packet;
-	}
-	
-	public PacketTemplate getPacketTemplate( byte[] buffer) {
-		PacketTemplate defPacket = getDefaultPacket();
-		return getNestedPacketTemplate(buffer, defPacket);
-	}
-	
-	public DecodedPacket decodePacket( byte[] buffer) {
-		PacketTemplate packet = getPacketTemplate(buffer);
-		if (packet == null) return null;
-		return new DecodedPacket( buffer, packet);
-	}
-	
 	public static PDL readDescription( String path) {
 
 		try {
@@ -313,7 +281,7 @@ public class PDL {
 		byte [] packetRaw = { 0, 0, 2, 0, 11,   0, 0,   0, 0, 0,   0, 0, 0,  0, 0, 0 };
 		PDL parser = readDescription( "packetdefinitions/ewsn07.h");
 		parser.dumpDescription();
-		DecodedPacket packet = parser.decodePacket(packetRaw);
+		DecodedPacket packet = DecodedPacket.createPacketFromBuffer(parser, packetRaw);
 		System.out.print( packet );
 	}
 }
