@@ -24,7 +24,7 @@ public class PacketMerger extends AbstractSource<PacketTuple> {
 			Packet p = sorter.getNextPacket();
 			if (p == null) return null ;
 			byte[] rawData = p.getTOSmsg();  								    // convert linkdump to raw TOS_msg
-			DecodedPacket decodedPacket = parser.decodePacket(rawData);      // create DecodedPacket from it
+			DecodedPacket decodedPacket = DecodedPacket.createPacketFromBuffer(parser, rawData);      // create DecodedPacket from it
 			packetTuple = new PacketTuple(decodedPacket, p.getTime() - timebase); // correct timestamp
 		} catch (Exception e) {
 			e.printStackTrace();

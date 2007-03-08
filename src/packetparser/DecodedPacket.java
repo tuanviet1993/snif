@@ -2,81 +2,50 @@ package packetparser;
 
 public class DecodedPacket {
 
-    // String type;
-    // Vector attributes = new Vector();
 	PacketTemplate template;
 	byte rawData[];
 	int hashCode;
 	
-    DecodedPacket(byte rawData[], PacketTemplate template){
+    private DecodedPacket(byte rawData[], PacketTemplate template){
     	this.rawData = rawData;
     	this.template = template;
     	calcHash();
     }
     
-    DecodedPacket( DecodedPacket other){
+    private DecodedPacket( DecodedPacket other){
     	rawData = new byte[other.rawData.length];
     	System.arraycopy(other.rawData, 0, rawData, 0, other.rawData.length);
     	template = other.template;
     	calcHash();
     }
     
-	String parseByteArray(PacketTemplate template, byte buffer[], int byteOffset, String prefix) {
-		// parse parent (extension)
-		String postfix = template.typeName;
-		if (template.parent != null) {
-			postfix = parseByteArray(template.parent, buffer, byteOffset, prefix) + "."
-					+ template.typeName;
-		}
-		// add prefix 
-		if (!prefix.equals(""))
-			postfix = prefix + "." + postfix;
-
-		for (Attribute att : template.attributes) {
-			if (att.type instanceof PacketTemplate) {
-				// ((PacketTemplate) att.type).parseByteArray( buffer, att.offset + byteOffset , prefix + "." + att.name);
-				parseByteArray(((PacketTemplate) att.type), buffer, att.offset
-						+ byteOffset, postfix + "." + att.name);
-			} else {
-				// all information available.. do something with it
-				// System.out.println( prefix + "." + att.name + ": " + (byteOffset + att.offset) + ", " + (att.elements) + " * " + (att.type.size)); 
-				System.out.print(postfix + "." + att.name + ": "
-						+ (byteOffset + att.offset) + ", " + (att.elements)
-						+ " * " + (att.type.size));
-				System.out.print("{");
-				for (int i = 0; i < att.elements; i++) {
-					int value = getInt(buffer, byteOffset + att.offset + i
-							* att.type.size, att.type.size,
-							TypeSpecifier.littleEndian);
-					System.out.print(" " + value);
-				}
-				System.out.println("}");
+	private static PacketTemplate getNestedPacketTemplate( byte[] buffer, PacketTemplate packet) {
+		for (PacketTemplate child : packet.extensions ) {
+			// check for conditions 
+			if (child.guardField == null) {
+				return getNestedPacketTemplate(buffer,child);
+			}
+			Attribute attribute = child.guardField;
+			if ( DecodedPacket.getInt(buffer, attribute.offset, attribute.type.size,
+			TypeSpecifier.littleEndian) == child.guardValue) {
+				// System.out.println("getNestedPacketTemplate: "+packet.typeName+" is a " + child.typeName);
+				return getNestedPacketTemplate(buffer, child);
 			}
 		}
-		return postfix;
+		return packet;
 	}
 	
-	static public int getInt(byte buffer[], int offset, int size, boolean littleEndian) {
-		if (offset + size > buffer.length)
-			return -1;
-
-		int step = 1;
-		if (littleEndian) {
-			offset += size - 1;
-			step = -1;
-		}
-		int value = 0;
-		while (size > 0) {
-			int currByte = buffer[offset];
-			if (currByte < 0) {
-				currByte += 256;
-			}
-			value = (value << 8) + currByte;
-			offset += step;
-			size--;
-		}
-		return value;
+	private static PacketTemplate getPacketTemplate(PDL parser, byte[] buffer) {
+		PacketTemplate defPacket = parser.getDefaultPacket();
+		return getNestedPacketTemplate(buffer, defPacket);
 	}
+
+	public static DecodedPacket createPacketFromBuffer( PDL parser, byte[] buffer) {
+		PacketTemplate packet = getPacketTemplate(parser, buffer);
+		if (packet == null) return null;
+		return new DecodedPacket( buffer, packet);
+	}
+
 
 
 	private void calcHash() {
@@ -118,6 +87,30 @@ public class DecodedPacket {
     	return result;
     }
     
+    
+	static public int getInt(byte buffer[], int offset, int size, boolean littleEndian) {
+		if (offset + size > buffer.length)
+			return -1;
+
+		int step = 1;
+		if (littleEndian) {
+			offset += size - 1;
+			step = -1;
+		}
+		int value = 0;
+		while (size > 0) {
+			int currByte = buffer[offset];
+			if (currByte < 0) {
+				currByte += 256;
+			}
+			value = (value << 8) + currByte;
+			offset += step;
+			size--;
+		}
+		return value;
+	}
+
+	
     private Integer getIntAttribute(PacketTemplate type, int offset, String attribute) {
 
     	// TODO match "(TypeName)" 
@@ -195,6 +188,21 @@ public class DecodedPacket {
     	return null;
     }
     
+
+	public boolean exists(String attribute) {
+		return  getIntAttribute(template, 0, attribute) != null;
+	}
+	
+	public byte [] getRaw(){
+		return rawData;
+	}
+	
+	public int getLength() {
+		return rawData.length;
+	}
+
+	/*** toString ******/
+	
 	/**
 	 * Prefix a number and append to buffer
 	 * @param buffer
@@ -234,84 +242,44 @@ public class DecodedPacket {
     	appendData( result );
     	return template.typeName + " " + result.toString();
     }
-
-    public void dumpStruct( StringBuffer result, PacketTemplate template, PacketTemplate subtype) {
-    	
-    	if (template.parent != null) {
-    		// print parent first
-    		dumpStruct( result, template.parent, template );
-    	}
- 
-    	// figure out, which one is parent 
-    	String nested = null;
-    	if (subtype != null) {
-    		nested = subtype.expands.name;
-    	}
-    	result.append( template.getTypeName()+":\n");
-    	
-    	// print own
-    	for (Attribute att : template.getAttributes()) {
-    		if (!att.name.equals(nested)) {
-    			if (att.type.elements > 1) {
-    				for (int idx = 0; idx<att.type.elements; idx++) {
-        				result.append( att.name + "["+idx+"] = "+ getInt(rawData, att.offset, att.type.size,
-						TypeSpecifier.littleEndian) + ";\n");
-        				// check for struct / non-struct
-    				}
-    			} else {
-    				// check for struct / non-struct
-    				result.append( att.name + " = " + getInt(rawData, att.offset, att.type.size,
-					TypeSpecifier.littleEndian) + ";\n");
-    			}
-    		}
-    	}
-    	result.append("\n");
-    }
     
     public String toStringPretty() {
     	StringBuffer result = new StringBuffer();
-    	// get root
-    	result.append( " {\n");
-    	dumpStruct2(result, template, null, "");
-    	result.append( "}\n");
+		dumpElement(result, template, 0, template.getTypeName(), "");
     	return result.toString();
     }
     
-    
-    public void dumpStruct2(StringBuffer result, PacketTemplate template, PacketTemplate subtype, String prefix ) {
-    	// figure out, which one is parent 
-    	String nested = null;
-    	if (subtype != null) {
-    		nested = subtype.expands.name;
-    	}
-    	// print own
-    	for (Attribute att : template.getAttributes()) {
-    		if (!att.name.equals(nested)) {
-    			if (att.type.elements > 1) {
-    				for (int idx = 0; idx<att.type.elements; idx++) {
-        				result.append( att.name + "["+idx+"] = "+ getInt(rawData, att.offset, att.type.size,
-						TypeSpecifier.littleEndian) + ";\n");
-        				// check for struct / non-struct
-    				}
-    			} else {
-    				// check for struct / non-struct
-    				result.append( att.name + " = " + getInt(rawData, att.offset, att.type.size,
-					TypeSpecifier.littleEndian) + ";\n");
-    			}
-    		}
-    	}
-    	result.append("\n");
-
-    	
-    	
-    }
-    
-	public boolean exists(String attribute) {
-		return  getIntAttribute(template, 0, attribute) != null;
-	}
-	
-	public byte [] getRaw(){
-		return rawData;
+	private void dumpElement(StringBuffer result, PacketTemplate template, int byteOffset, String type, String prefix) {
+		
+		// parse parent (extension)
+		if (template.parent != null) {
+			dumpElement(result, template.parent, byteOffset, template.parent.typeName, prefix);
+		}
+		// add "." to prefix if used
+		if (!prefix.equals("")) {
+			prefix = prefix + ".";
+		}
+		
+		for (Attribute att : template.attributes) {
+			if (att.type instanceof PacketTemplate) {
+				if (att.elements > 1 ) {
+					for (int i =  0; i<att.elements; i++) {
+						dumpElement(result, ((PacketTemplate) att.type), att.offset + byteOffset + i*att.type.size, type, prefix + att.name + "["+i+"]");
+					}
+				} else {
+					dumpElement(result, ((PacketTemplate) att.type), att.offset + byteOffset, ((PacketTemplate) att.type).typeName, prefix + att.name);
+				}
+			} else {
+				// all information available.. do something with it
+				result.append ( "[" + type + "] " + prefix + att.name + " = " );
+				for (int i = 0; i < att.elements; i++) {
+					int value = getInt(rawData, byteOffset + att.offset + i * att.type.size, att.type.size,
+							TypeSpecifier.littleEndian);
+					result.append(value + " (0x"+Integer.toHexString(value)+")");
+				}
+				result.append("\n");
+			}
+		}
 	}
 	
 	public static void main (String args[]) {
@@ -341,7 +309,8 @@ public class DecodedPacket {
 		System.out.println(" bInteger "+bInteger.hashCode() );
 	}
 
-	public int getLength() {
-		return rawData.length;
+	public PacketTemplate getTemplate() {
+		return template;
 	}
+
 }

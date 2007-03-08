@@ -119,7 +119,8 @@ public class PacketTemplate extends TypeSpecifier {
 		}
 		return null;
 	}
-	PacketTemplate getSuper() {
+	
+	public PacketTemplate getSuper() {
 		if (parent != null)
 			return parent;
 		return this;
@@ -161,6 +162,7 @@ public class PacketTemplate extends TypeSpecifier {
 		return result.toString();
 	}
 
+	
 	/**
 	 * return PacketTemplate as list of attributes 
 	 * @return
@@ -198,10 +200,6 @@ public class PacketTemplate extends TypeSpecifier {
 		return result.toString();
 	}
 
-	/**
-	 * @param result
-	 * @param att
-	 */
 	private void addFlatObject(String prefix, StringBuffer result, Attribute att) {
 		if (!prefix.equals(""))
 			prefix += ".";

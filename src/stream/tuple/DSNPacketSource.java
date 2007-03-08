@@ -66,7 +66,7 @@ public class DSNPacketSource extends AbstractSource<PacketTuple> implements Real
 		DecodedPacket packet = null;
 		if (len > 11){
 			// if len <= 11 we just received a timestamp
-			packet = parser.decodePacket(packetRaw);
+			packet = DecodedPacket.createPacketFromBuffer(parser, packetRaw);
 		}
 		PacketTuple tuple = new PacketTuple(packet, timestamp);
 		tuple.setDsnNode(btAddress);
