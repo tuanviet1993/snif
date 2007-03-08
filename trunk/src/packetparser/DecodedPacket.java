@@ -23,7 +23,42 @@ public class DecodedPacket {
     	calcHash();
     }
     
-    private void calcHash() {
+	String parseByteArray(PacketTemplate template, byte buffer[], int byteOffset, String prefix) {
+		// parse parent (extension)
+		String postfix = template.typeName;
+		if (template.parent != null) {
+			postfix = parseByteArray(template.parent, buffer, byteOffset, prefix) + "."
+					+ template.typeName;
+		}
+		// add prefix 
+		if (!prefix.equals(""))
+			postfix = prefix + "." + postfix;
+
+		for (Attribute att : template.attributes) {
+			if (att.type instanceof PacketTemplate) {
+				// ((PacketTemplate) att.type).parseByteArray( buffer, att.offset + byteOffset , prefix + "." + att.name);
+				parseByteArray(((PacketTemplate) att.type), buffer, att.offset
+						+ byteOffset, postfix + "." + att.name);
+			} else {
+				// all information available.. do something with it
+				// System.out.println( prefix + "." + att.name + ": " + (byteOffset + att.offset) + ", " + (att.elements) + " * " + (att.type.size)); 
+				System.out.print(postfix + "." + att.name + ": "
+						+ (byteOffset + att.offset) + ", " + (att.elements)
+						+ " * " + (att.type.size));
+				System.out.print("{");
+				for (int i = 0; i < att.elements; i++) {
+					int value = template.getInt(buffer, byteOffset + att.offset + i
+							* att.type.size, att.type.size,
+							TypeSpecifier.littleEndian);
+					System.out.print(" " + value);
+				}
+				System.out.println("}");
+			}
+		}
+		return postfix;
+	}
+	
+	private void calcHash() {
     	StringBuffer content = new StringBuffer();
     	for (int i = 0; i < rawData.length; i++) {
     		content.append( ".");
@@ -198,12 +233,14 @@ public class DecodedPacket {
     		if (!att.name.equals(nested)) {
     			if (att.type.elements > 1) {
     				for (int idx = 0; idx<att.type.elements; idx++) {
-        				result.append( att.name + "["+idx+"] = "+ template.getInt(rawData, att) + ";\n");
+        				result.append( att.name + "["+idx+"] = "+ template.getInt(rawData, att.offset, att.type.size,
+						TypeSpecifier.littleEndian) + ";\n");
         				// check for struct / non-struct
     				}
     			} else {
     				// check for struct / non-struct
-    				result.append( att.name + " = " + template.getInt(rawData, att) + ";\n");
+    				result.append( att.name + " = " + template.getInt(rawData, att.offset, att.type.size,
+					TypeSpecifier.littleEndian) + ";\n");
     			}
     		}
     	}
@@ -214,9 +251,38 @@ public class DecodedPacket {
     	StringBuffer result = new StringBuffer();
     	// get root
     	result.append( " {\n");
-    	dumpStruct(result, template, null);
+    	dumpStruct2(result, template, null, "");
     	result.append( "}\n");
     	return result.toString();
+    }
+    
+    
+    public void dumpStruct2(StringBuffer result, PacketTemplate template, PacketTemplate subtype, String prefix ) {
+    	// figure out, which one is parent 
+    	String nested = null;
+    	if (subtype != null) {
+    		nested = subtype.expands.name;
+    	}
+    	// print own
+    	for (Attribute att : template.getAttributes()) {
+    		if (!att.name.equals(nested)) {
+    			if (att.type.elements > 1) {
+    				for (int idx = 0; idx<att.type.elements; idx++) {
+        				result.append( att.name + "["+idx+"] = "+ template.getInt(rawData, att.offset, att.type.size,
+						TypeSpecifier.littleEndian) + ";\n");
+        				// check for struct / non-struct
+    				}
+    			} else {
+    				// check for struct / non-struct
+    				result.append( att.name + " = " + template.getInt(rawData, att.offset, att.type.size,
+					TypeSpecifier.littleEndian) + ";\n");
+    			}
+    		}
+    	}
+    	result.append("\n");
+
+    	
+    	
     }
     
 	public boolean exists(String attribute) {
