@@ -207,7 +207,7 @@ public class PDL {
 				return getNestedPacketTemplate(buffer,child);
 			}
 			Attribute attribute = child.guardField;
-			if ( child.getInt(buffer, attribute.offset, attribute.type.size,
+			if ( DecodedPacket.getInt(buffer, attribute.offset, attribute.type.size,
 			TypeSpecifier.littleEndian) == child.guardValue) {
 				// System.out.println("getNestedPacketTemplate: "+packet.typeName+" is a " + child.typeName);
 				return getNestedPacketTemplate(buffer, child);
