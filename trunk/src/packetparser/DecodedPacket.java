@@ -1,7 +1,5 @@
 package packetparser;
 
-import java.util.Vector;
-
 public class DecodedPacket {
 
     // String type;
@@ -47,7 +45,7 @@ public class DecodedPacket {
 						+ " * " + (att.type.size));
 				System.out.print("{");
 				for (int i = 0; i < att.elements; i++) {
-					int value = template.getInt(buffer, byteOffset + att.offset + i
+					int value = getInt(buffer, byteOffset + att.offset + i
 							* att.type.size, att.type.size,
 							TypeSpecifier.littleEndian);
 					System.out.print(" " + value);
@@ -58,6 +56,29 @@ public class DecodedPacket {
 		return postfix;
 	}
 	
+	static public int getInt(byte buffer[], int offset, int size, boolean littleEndian) {
+		if (offset + size > buffer.length)
+			return -1;
+
+		int step = 1;
+		if (littleEndian) {
+			offset += size - 1;
+			step = -1;
+		}
+		int value = 0;
+		while (size > 0) {
+			int currByte = buffer[offset];
+			if (currByte < 0) {
+				currByte += 256;
+			}
+			value = (value << 8) + currByte;
+			offset += step;
+			size--;
+		}
+		return value;
+	}
+
+
 	private void calcHash() {
     	StringBuffer content = new StringBuffer();
     	for (int i = 0; i < rawData.length; i++) {
@@ -154,7 +175,7 @@ public class DecodedPacket {
 							return att.elements;
 						}
 						if (att.elements == PacketTemplate.variableSizedDirect) {
-							return template.getInt( rawData, offset + type.lengthPos, type.lengthField.type.size, TypeSpecifier.littleEndian);
+							return getInt( rawData, offset + type.lengthPos, type.lengthField.type.size, TypeSpecifier.littleEndian);
 						}
 						if (att.elements == PacketTemplate.variableSizedIndirect) {
 							// get total (sub-)struct size
@@ -166,9 +187,9 @@ public class DecodedPacket {
 				}
 				// check for single variable sized component
 				if (type.fixedLength == false && att.offset > type.lengthPos){
-					offset += type.getInt( rawData, offset + type.lengthPos, type.lengthField.type.size, TypeSpecifier.littleEndian);
+					offset += getInt( rawData, offset + type.lengthPos, type.lengthField.type.size, TypeSpecifier.littleEndian);
 				}
-		    	return template.getInt( rawData, offset + att.offset, att.type.size, TypeSpecifier.littleEndian);
+		    	return getInt( rawData, offset + att.offset, att.type.size, TypeSpecifier.littleEndian);
 			}
 		}
     	return null;
@@ -214,7 +235,7 @@ public class DecodedPacket {
     	return template.typeName + " " + result.toString();
     }
 
-    private void dumpStruct( StringBuffer result, PacketTemplate template, PacketTemplate subtype) {
+    public void dumpStruct( StringBuffer result, PacketTemplate template, PacketTemplate subtype) {
     	
     	if (template.parent != null) {
     		// print parent first
@@ -233,13 +254,13 @@ public class DecodedPacket {
     		if (!att.name.equals(nested)) {
     			if (att.type.elements > 1) {
     				for (int idx = 0; idx<att.type.elements; idx++) {
-        				result.append( att.name + "["+idx+"] = "+ template.getInt(rawData, att.offset, att.type.size,
+        				result.append( att.name + "["+idx+"] = "+ getInt(rawData, att.offset, att.type.size,
 						TypeSpecifier.littleEndian) + ";\n");
         				// check for struct / non-struct
     				}
     			} else {
     				// check for struct / non-struct
-    				result.append( att.name + " = " + template.getInt(rawData, att.offset, att.type.size,
+    				result.append( att.name + " = " + getInt(rawData, att.offset, att.type.size,
 					TypeSpecifier.littleEndian) + ";\n");
     			}
     		}
@@ -268,13 +289,13 @@ public class DecodedPacket {
     		if (!att.name.equals(nested)) {
     			if (att.type.elements > 1) {
     				for (int idx = 0; idx<att.type.elements; idx++) {
-        				result.append( att.name + "["+idx+"] = "+ template.getInt(rawData, att.offset, att.type.size,
+        				result.append( att.name + "["+idx+"] = "+ getInt(rawData, att.offset, att.type.size,
 						TypeSpecifier.littleEndian) + ";\n");
         				// check for struct / non-struct
     				}
     			} else {
     				// check for struct / non-struct
-    				result.append( att.name + " = " + template.getInt(rawData, att.offset, att.type.size,
+    				result.append( att.name + " = " + getInt(rawData, att.offset, att.type.size,
 					TypeSpecifier.littleEndian) + ";\n");
     			}
     		}

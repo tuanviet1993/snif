@@ -125,30 +125,6 @@ public class PacketTemplate extends TypeSpecifier {
 		return this;
 	}
 
-	public int getInt(byte buffer[], int offset, int size, boolean littleEndian) {
-		if (offset + size > buffer.length)
-			return -1;
-
-		int step = 1;
-		if (littleEndian) {
-			offset += size - 1;
-			step = -1;
-		}
-		int value = 0;
-		while (size > 0) {
-			int currByte = buffer[offset];
-			if (currByte < 0) {
-				currByte += 256;
-			}
-			value = (value << 8) + currByte;
-			offset += step;
-			size--;
-		}
-		return value;
-	}
-
-
-	
 	public String [] getAttributeNames(){
 		String [] result = new String[ attributes.size()];
 		int i=0;
