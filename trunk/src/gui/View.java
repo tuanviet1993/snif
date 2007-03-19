@@ -138,6 +138,7 @@ public class View extends JFrame implements ActionListener, ChangeListener {
 	private JButton open;
 
 	private JButton stop;
+	private JTextArea wArea;
 
     public View(SNIFController controller) {
     	super("SNIF: Sensor Network Inspection Framework");
@@ -248,6 +249,13 @@ public class View extends JFrame implements ActionListener, ChangeListener {
         connect = new JButton("Connect");
 		connect.addActionListener(this);
         
+        open = new JButton("Open");
+		open.addActionListener(this);
+
+		stop = new JButton("Stop");
+		stop.addActionListener(this);
+        stop.setEnabled(false);
+
         JButton reorder = new JButton("Reorder");
         reorder.addActionListener(new ActionListener() {
         	public void actionPerformed(ActionEvent e) {
@@ -255,13 +263,6 @@ public class View extends JFrame implements ActionListener, ChangeListener {
         		vv.setGraphLayout(layout);
         	}
         });
-        
-        open = new JButton("Open");
-		open.addActionListener(this);
-        
-        stop = new JButton("Stop");
-		stop.addActionListener(this);
-        stop.setEnabled(false);
         
         speedSlider = new JSlider(JSlider.HORIZONTAL);
         speedSlider.setPreferredSize(new Dimension(130, 50));
@@ -285,6 +286,7 @@ public class View extends JFrame implements ActionListener, ChangeListener {
         
         textArea = new JTextArea(2, 20);
         timeArea = new JTextArea(1, 5);
+        wArea = new JTextArea(1,5);
                 
         JButton help = new JButton("Help");
         help.addActionListener(new ActionListener() {
@@ -306,15 +308,19 @@ public class View extends JFrame implements ActionListener, ChangeListener {
         JPanel controls = new JPanel();
         JPanel show = new JPanel(new BorderLayout());
 
-        JPanel runPanel = new JPanel(new GridLayout(2,1));
-        runPanel.setBorder(BorderFactory.createTitledBorder("Input"));
-        runPanel.add(connect);
-        runPanel.add(open);
+        JPanel inputPanel = new JPanel(new GridLayout(2,1));
+        inputPanel.setBorder(BorderFactory.createTitledBorder("Input"));
+        inputPanel.add(connect);
+        inputPanel.add(open);
         
-        JPanel filePanel = new JPanel(new GridLayout(2,1));
-        filePanel.setBorder(BorderFactory.createTitledBorder("Run"));
-        filePanel.add(stop);
-        filePanel.add(reorder);
+        JPanel wPanel = new JPanel(new GridLayout(1,1));
+        wPanel.setBorder(BorderFactory.createTitledBorder("Window W"));
+        wPanel.add(wArea);
+
+        JPanel runPanel = new JPanel(new GridLayout(2,1));
+        runPanel.setBorder(BorderFactory.createTitledBorder("Run"));
+        runPanel.add(stop);
+        runPanel.add(reorder);
        
         JPanel speedPanel = new JPanel(new GridLayout(1,1));
         speedPanel.setBorder(BorderFactory.createTitledBorder("Time Factor"));
@@ -336,8 +342,9 @@ public class View extends JFrame implements ActionListener, ChangeListener {
         showMetricsPanel.setBorder(BorderFactory.createTitledBorder("Metrics"));
         showMetricsPanel.add(scroll);
         
+        controls.add(inputPanel);
+        controls.add(wPanel);
         controls.add(runPanel);
-        controls.add(filePanel);
         controls.add(speedPanel);
         controls.add(outputPanel);
         controls.add(timePanel);
@@ -450,6 +457,8 @@ public class View extends JFrame implements ActionListener, ChangeListener {
 			oldTime = time;
     	}
     }
+    
+    
     
     /**
      * evidence that a node exists was gathered is directly or indirectly
@@ -657,5 +666,15 @@ public class View extends JFrame implements ActionListener, ChangeListener {
 	public void setNodeCoordinates(HashMap<Integer, Coordinates> nodeCoordinates) {
 		this.nodeCoordinates = nodeCoordinates;
 		this.haveCoordinates = true;
+	}
+
+	public int getW() {
+		String wString = wArea.getText();
+		Integer wInteger = Integer.parseInt(wString);
+		return wInteger;
+	}
+
+	public void setW(int W) {
+		wArea.setText( ""+W);
 	}
 }
