@@ -290,7 +290,7 @@ public class DetectionAlgoTuple {
 		pathAdvertisementMapper.subscribe(maxPathQuality , id++);
 		
 		// Route analyzer: detects "GoodRoute"s, "RoutingLoop" and performs "LatencyMeasurement"
-		AbstractPipe<Tuple,Tuple> routeAnalyzer = new RouteAnalyzer(theSink);
+		AbstractPipe<Tuple,Tuple> routeAnalyzer = new PathAnalyzer(theSink);
 		packetTracer.subscribe( routeAnalyzer, id++);
 
 		// get LatencyMeasurement measurements (?)
@@ -426,7 +426,7 @@ public class DetectionAlgoTuple {
 		// network partition detetction  TODO --
 		int packetTracerID = id++;
 		int nodeStateChangeFilterID = id++;
-		NetworkPartitionDetection partitionDetection = new NetworkPartitionDetection(
+		TopologyAnalyzer partitionDetection = new TopologyAnalyzer(
 				theSink, 2 * pathAdvPeriod * packetMultiply, 10 * 1000, nodeStateChangeFilterID, packetTracerID);
 		packetTracer.subscribe( partitionDetection, packetTracerID);
 		nodeStateChangeFilter.subscribe( partitionDetection, nodeStateChangeFilterID);
