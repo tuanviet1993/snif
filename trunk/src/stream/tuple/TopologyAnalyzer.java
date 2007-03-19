@@ -97,6 +97,25 @@ public class TopologyAnalyzer extends AbstractPipe<Tuple,Tuple> implements
 		
 	}
 
+
+	/** 
+	 * evaluate all nodes
+	 *
+	 */
+	protected void validateNew(long timestamp) {
+		if (timestamp > lastEvaluation + metricPeriod){
+			// System.out.println("Network Parition, Validate at " + timestamp/1000);
+
+			// clear evaluation markers
+			for (NodeAddress node : nodeStates.keySet()){
+				NodeState nodeState = nodeStates.get( node );
+				nodeState.inEvaluation = true;
+				nodeState.partitionCause = "";
+			}
+			// TODO implement faster algorithm, see paper
+		}
+	}
+
 	/** 
 	 * evaluate all nodes
 	 *
@@ -111,6 +130,7 @@ public class TopologyAnalyzer extends AbstractPipe<Tuple,Tuple> implements
 				NodeState nodeState = nodeStates.get( node );
 				nodeState.inEvaluation = true;
 				nodeState.partitionCause = "";
+				nodeState.upstreamConnection = null;
 			}
 			
 			// mark all crashed nodes and nodes which could reach the sink
@@ -125,9 +145,14 @@ public class TopologyAnalyzer extends AbstractPipe<Tuple,Tuple> implements
 			do {
 				changed = false;
 				for (NodeAddress node : nodeStates.keySet()){
-					reportParitionedNodes( node, timestamp);
+					reportParitionedNodes( node, timestamp, false);
 				}
 			} while (changed);
+			
+			// also report nodes which are still in evaluation
+			for (NodeAddress node : nodeStates.keySet()){
+				reportParitionedNodes( node, timestamp, true);
+			}
 			
 			//System.out.println("time network partition "+timeUsedNano);
 			lastEvaluation = timestamp;
@@ -139,7 +164,8 @@ public class TopologyAnalyzer extends AbstractPipe<Tuple,Tuple> implements
 		NodeState nodeState = nodeStates.get( node );
 		// of interest?
 		if (!nodeState.inEvaluation) return;
-
+ 		if (nodeState.upstreamConnection == ConnectionType.routeToSink) return;
+		
 		// check this node for NodeCrash
 		Tuple nodeStateTuple = nodeState.stateTuple;
 		if (nodeStateTuple == null) {
@@ -203,10 +229,11 @@ public class TopologyAnalyzer extends AbstractPipe<Tuple,Tuple> implements
 
 
 	
-	private void reportParitionedNodes(NodeAddress node, long timestamp ) {
+	private void reportParitionedNodes(NodeAddress node, long timestamp, boolean markNonEvaluated ) {
 		NodeState nodeState = nodeStates.get( node );
 		// of interest?
 		if (!nodeState.inEvaluation) return;
+		
 		// check its uplinks
 		int counter = 0;
 		for (TimeStampedObject<Tuple> routeSegment : window ) {
@@ -219,8 +246,11 @@ public class TopologyAnalyzer extends AbstractPipe<Tuple,Tuple> implements
 
 			// check if upstream node is evaluated and has route
 			NodeState nodeUpState = nodeStates.get( l2dst );
-			if (nodeUpState == null) continue;
-			if (nodeUpState.inEvaluation) continue;
+
+			// are all uplinks evaluated ?
+			if (!markNonEvaluated && nodeUpState == null) return;
+			if (!markNonEvaluated && nodeUpState.inEvaluation) return;
+			
 			// upstream node has crashed
 			if (nodeUpState.upstreamConnection == ConnectionType.crashed) {
 				if ( nodeState.partitionCause.indexOf( l2dst.toString()) < 0) {
@@ -247,6 +277,7 @@ public class TopologyAnalyzer extends AbstractPipe<Tuple,Tuple> implements
 				// System.out.println("Network Paritioned at " + timestamp/1000 + " " + result);
 				transfer( result, timestamp );
 			}
+			changed = true;
 		}
 		nodeState.inEvaluation = false;
 	}
