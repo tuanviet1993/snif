@@ -17,7 +17,7 @@ import stream.TimeTriggered;
  * @todo: only send if node partition state changes
  * 
  */
-public class NetworkPartitionDetection extends AbstractPipe<Tuple,Tuple> implements
+public class TopologyAnalyzer extends AbstractPipe<Tuple,Tuple> implements
 		TimeTriggered {
 
 	private class NodeState {
@@ -80,7 +80,7 @@ public class NetworkPartitionDetection extends AbstractPipe<Tuple,Tuple> impleme
 	 * @param window
 	 * @param groupFieldID
 	 */
-	public NetworkPartitionDetection(NodeAddress sink, int timewindow, int metricPeriod,
+	public TopologyAnalyzer(NodeAddress sink, int timewindow, int metricPeriod,
 			int nodeStateChangeSrcID, int packetTracerSrcID) {
 		this.sink = sink;
 		this.timewindow = timewindow;

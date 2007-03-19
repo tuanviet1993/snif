@@ -31,12 +31,12 @@ import stream.tuple.DistinctInWindow;
 import stream.tuple.GroupingEvaluator;
 import stream.tuple.LogReader;
 import stream.tuple.Mapper;
-import stream.tuple.NetworkPartitionDetection;
+import stream.tuple.TopologyAnalyzer;
 import stream.tuple.PacketCrcPredicate;
 import stream.tuple.PacketTuple;
 import stream.tuple.PacketTupleTracer;
 import stream.tuple.Ratio;
-import stream.tuple.RouteAnalyzer;
+import stream.tuple.PathAnalyzer;
 import stream.tuple.SeqNrResetDetector;
 import stream.tuple.TreeAttributePredicate;
 import stream.tuple.Tuple;
@@ -260,7 +260,7 @@ public class EWSNDebugger extends SNIFController {
 			neighboursSeenLastEpoch.subscribe( neighboursSeenLastEpochIDMapper, 0);
 
 			// Route analyzer: detects "GoodRoute"s, "RoutingLoop" and performs "LatencyMeasurement"
-			AbstractPipe<Tuple,Tuple> routeAnalyzer = new RouteAnalyzer(theSink);
+			AbstractPipe<Tuple,Tuple> routeAnalyzer = new PathAnalyzer(theSink);
 			packetTracer.subscribe( routeAnalyzer, 0);
 
 			// get LatencyMeasurement measurements (?)
@@ -427,7 +427,7 @@ public class EWSNDebugger extends SNIFController {
 			// network partition detetction
 			int packetTracerID = 1;
 			int nodeStateChangeFilterID = 2;
-			NetworkPartitionDetection partitionDetection = new NetworkPartitionDetection(
+			TopologyAnalyzer partitionDetection = new TopologyAnalyzer(
 					theSink, 4 * epoch, 10 * 1000, nodeStateChangeFilterID, packetTracerID);
 			packetTracer.subscribe( partitionDetection, packetTracerID);
 			nodeStateChangeFilter.subscribe( partitionDetection, nodeStateChangeFilterID);
