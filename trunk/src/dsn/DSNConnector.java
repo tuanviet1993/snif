@@ -56,14 +56,18 @@ public class DSNConnector extends Thread implements DiscoveryListener {
 	
 	public void deviceDiscovered(RemoteDevice btDevice, DeviceClass cod) {
 		String address = btDevice.getBluetoothAddress();
+		view.writeMessage("Found " + address +" , Service: "+cod.getServiceClasses()+", Major: "
+				+ cod.getMajorDeviceClass() + ", Minor: " + cod.getMinorDeviceClass());
+
 		if (snifGateway != null) return;
+
 		
 		if (address.startsWith(btPrefix)   &&
 //			cod.getServiceClasses() == 0   &&
 //			cod.getMajorDeviceClass() == SNIF_COD_MAJOR &&
 //			cod.getMinorDeviceClass() == SNIF_COD_MINOR &&
 			true	) {
-			writeMessage("BTNode " + address +" , Service: "+cod.getServiceClasses()+", Major: "
+			view.writeMessage("BTNode " + address +" , Service: "+cod.getServiceClasses()+", Major: "
 					+ cod.getMajorDeviceClass() + ", Minor: " + cod.getMinorDeviceClass());
 			snifGateway = address;
 		}
@@ -114,12 +118,17 @@ public class DSNConnector extends Thread implements DiscoveryListener {
 			    // wait a bit more
 			    Thread.sleep(200);
 
-			    // try to connect
-			    con = (L2CAPConnection) Connector.open("btl2cap://" + snifGateway + ":1011");
+			    if (snifGateway != null) {
+			    	// try to connect
+			    	writeMessage("Connecting to DSN via BTnode " + snifGateway);
+			    	con = (L2CAPConnection) Connector.open("btl2cap://" + snifGateway + ":1011");
 
-			    // connected !!!
-				writeMessage("Connected to DSN via BTnode " + snifGateway);
-				return;
+			    	// connected !!!
+			    	view.writeMessage("Connected to DSN via BTnode " + snifGateway);
+			    	return;
+			    } else {
+			    	view.writeMessage("Retry...");
+			    }
 			}
 			catch (IOException ioex) {
 				view.writeMessage("Couldn't establish connection.\nPlease retry.");
