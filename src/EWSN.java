@@ -136,8 +136,14 @@ public class EWSN extends SNIFController {
 		EWSN debugger = new EWSN();
 		debugger.setup();
 
-		// epoch.. timeout
-		int epoch = 100 * 1000;
+		// W 
+		int W = 10;
+		// respective periods
+		final int beaconPeriod  = 10 * 1000;
+		final int linkAdvPeriod = 80 * 1000;
+		final int pathAdvPeriod = 80 * 1000;
+		@SuppressWarnings("unused")
+		final int dataPeriod    = 30 * 1000;
 
 		while (true) {
 
@@ -229,19 +235,19 @@ public class EWSN extends SNIFController {
 				multiHopFilter.subscribe(packetTracer, 0);
 			}
 			
-			// metric: number of packet received last epoch per node
-			TupleTimeWindowGroupAggregator packetsLastEpoch =
-				new TupleTimeWindowGroupAggregator ( epoch , "nodeID", new Counter( "PacketsLastEpoch", "packets"),"packetsLastEpoch");
-			packetIdStream.subscribe( packetsLastEpoch, 0);
+			// metric: number of packet received (W times beacon period) per node
+			TupleTimeWindowGroupAggregator packetCount =
+				new TupleTimeWindowGroupAggregator ( W * beaconPeriod , "nodeID", new Counter( "PacketsLastEpoch", "packets"),"packetsLastEpoch");
+			packetIdStream.subscribe( packetCount, 0);
 
-			// metric: number of valid route announcements last 2 epochs per node
+			// metric: number of valid route announcements ..e
 			TupleTimeWindowGroupAggregator pathAnnouncementsLastEpoch2 =
-				new TupleTimeWindowGroupAggregator ( 2 * epoch, "nodeID", new Counter( "RoutesLastEpoch", "routeAnnouncements"),"pathAnnouncementsLastEpoch");
+				new TupleTimeWindowGroupAggregator ( W * pathAdvPeriod, "nodeID", new Counter( "RoutesLastEpoch", "routeAnnouncements"),"pathAnnouncementsLastEpoch");
 			pathAdvertisementMapper.subscribe(pathAnnouncementsLastEpoch2 , 0);
 
-			// metric: number of neighbours reported node last 2 epochs per node
+			// metric: number of neighbours reported node ..
 			TupleTimeWindowDistinctGroupAggregator seenByNeighbours =
-				new TupleTimeWindowDistinctGroupAggregator ( 2 * epoch, new Counter("NeighbourReportsLastEpochTemp", "sightings"), "seenNode",
+				new TupleTimeWindowDistinctGroupAggregator ( W * linkAdvPeriod, new Counter("NeighbourReportsLastEpochTemp", "sightings"), "seenNode",
 						"reportingNode", "seenNode") ;
 			linkAdvertisementMapper.subscribe( seenByNeighbours, 0);
 
@@ -249,15 +255,15 @@ public class EWSN extends SNIFController {
 			Mapper seenByNeighboursIDMapper = new Mapper( "NeighbourReportsLastEpoch", "seenNode", "nodeID", "sightings" , "sightings" );
 			seenByNeighbours.subscribe( seenByNeighboursIDMapper, 0);
 
-			// metric: number of neighbours seen by node node last 2 epochs
-			TupleTimeWindowDistinctGroupAggregator neighboursSeenLastEpoch =
-				new TupleTimeWindowDistinctGroupAggregator ( 2 * epoch, new Counter("NeighbourSeenLastEpochTemp", "sightings"), "reportingNode",
+			// metric: number of neighbours seen by node node ..
+			TupleTimeWindowDistinctGroupAggregator neighboursSeen =
+				new TupleTimeWindowDistinctGroupAggregator ( W * linkAdvPeriod, new Counter("NeighbourSeenLastEpochTemp", "sightings"), "reportingNode",
 						"reportingNode", "seenNode");
-			linkAdvertisementMapper.subscribe( neighboursSeenLastEpoch, 0);
+			linkAdvertisementMapper.subscribe( neighboursSeen, 0);
 
 			// use "reportingNode" as "nodeID"
 			Mapper neighboursSeenLastEpochIDMapper = new Mapper( "NeighbourSeenLastEpoch", "reportingNode", "nodeID", "sightings", "sightings" );
-			neighboursSeenLastEpoch.subscribe( neighboursSeenLastEpochIDMapper, 0);
+			neighboursSeen.subscribe( neighboursSeenLastEpochIDMapper, 0);
 
 			// Route analyzer: detects "GoodRoute"s, "RoutingLoop" and performs "LatencyMeasurement"
 			AbstractPipe<Tuple,Tuple> routeAnalyzer = new RouteAnalyzer(theSink);
@@ -268,9 +274,9 @@ public class EWSN extends SNIFController {
 					new AttributePredicate("TupleType",  "LatencyMeasurement" )); 
 			routeAnalyzer.subscribe( goodRouteFilter, 0);
 
-			// metric: nr of good route reports last 2 epochs
+			// metric: nr of good route reports ..
 			TupleTimeWindowGroupAggregator goodRouteReports =
-				new TupleTimeWindowGroupAggregator ( 2 * epoch, "nodeID", new Counter( "GoodRoute", "reports"),"goodRouteReports");
+				new TupleTimeWindowGroupAggregator ( W * dataPeriod, "nodeID", new Counter( "GoodRoute", "reports"),"goodRouteReports");
 			goodRouteFilter.subscribe(goodRouteReports , 0);
 
 			// get RoutingLoop detections
@@ -278,24 +284,24 @@ public class EWSN extends SNIFController {
 					new AttributePredicate("TupleType",  "RoutingLoop" )); 
 			routeAnalyzer.subscribe( routingLoopFilter, 0);
 
-			// metric: nr of routing loops last epochs
+			// metric: nr of routing loops ..
 			TupleTimeWindowGroupAggregator routingLoopReports =
-				new TupleTimeWindowGroupAggregator ( epoch, "nodeID", new Counter( "RoutingLoops", "reports"),"routingLoopReports");
+				new TupleTimeWindowGroupAggregator ( W * dataPeriod, "nodeID", new Counter( "RoutingLoops", "reports"),"routingLoopReports");
 			routingLoopFilter.subscribe(routingLoopReports , 0);
 
-			// get observation quality last 2 epochs
+			// get observation quality ..
 			TupleTimeWindowDistinctGroupAggregator observationQuality = new TupleTimeWindowDistinctGroupAggregator
-			( epoch, new Ratio ( "ObservationQuality", "seqNr"), "nodeID", "nodeID", "seqNr") ;
+			( W * beaconPeriod, new Ratio ( "ObservationQuality", "seqNr"), "nodeID", "nodeID", "seqNr") ;
 			seqNrMapper.subscribe( observationQuality, 0 );
 			
 			// reboots last epoch
-			TupleTimeWindowGroupAggregator rebootsLastEpoch =
-				new TupleTimeWindowGroupAggregator ( epoch, "nodeID", new Counter( "RebootsLastEpoch", "reboots"),"rebootsLastEpoch");
-			seqResetDetector.subscribe(rebootsLastEpoch , 0);
+			TupleTimeWindowGroupAggregator rebootCount =
+				new TupleTimeWindowGroupAggregator ( W * beaconPeriod, "nodeID", new Counter( "RebootsLastEpoch", "reboots"),"rebootsLastEpoch");
+			seqResetDetector.subscribe(rebootCount , 0);
 			
 			// get all metric streams
 			Union<Tuple> metricStream = new Union<Tuple>();
-			packetsLastEpoch.subscribe( metricStream, 0);
+			packetCount.subscribe( metricStream, 0);
 			seenByNeighboursIDMapper.subscribe( metricStream, 0);
 			neighboursSeenLastEpochIDMapper.subscribe( metricStream, 0);
 			pathAnnouncementsLastEpoch2.subscribe(metricStream,0);
@@ -303,7 +309,7 @@ public class EWSN extends SNIFController {
 			routingLoopReports.subscribe( metricStream, 0);
 			// maxPathQuality.subscribe( metricStream, 0);
 			observationQuality.subscribe( metricStream, 0);
-			rebootsLastEpoch.subscribe(metricStream, 0);
+			rebootCount.subscribe(metricStream, 0);
 			
 			// get all event streams
 			Union<Tuple> eventStream = new Union<Tuple>();
@@ -346,11 +352,18 @@ public class EWSN extends SNIFController {
 			BinaryDecisionTree networkPartitionNoPath = new BinaryDecisionTree () {
 				final TupleAttribute crashedID = new TupleAttribute("crashedNodes");
 				final TupleAttribute resultID = new TupleAttribute("result");
+				final String [] attributes = new String [] { "crashedNodes","result" };
 				public Tuple invoke( HashMap<Object,Tuple> input) {
 					Tuple tuple = Tuple.createTuple("NetworkPartitioned");
 					tuple.setStringAttribute(crashedID, input.get("NodePartitioned").getStringAttribute(crashedID));
 					tuple.setStringAttribute(resultID, "NoParent");
 					return tuple;
+				}
+				public String getResultType() {
+					return "NetworkPartitioned";
+				}
+				public String[] getResultAttributes() {
+					return attributes;
 				}
 			};
 			
@@ -358,11 +371,18 @@ public class EWSN extends SNIFController {
 			BinaryDecisionTree networkPartitionNoGoodRoute = new BinaryDecisionTree () {
 				final TupleAttribute crashedID = new TupleAttribute("crashedNodes");
 				final TupleAttribute resultID = new TupleAttribute("result");
+				final String [] attributes = new String [] { "crashedNodes","result" };
 				public Tuple invoke( HashMap<Object,Tuple> input) {
 					Tuple tuple = Tuple.createTuple("NetworkPartitioned");
 					tuple.setStringAttribute(crashedID, input.get("NodePartitioned").getStringAttribute(crashedID));
 					tuple.setStringAttribute(resultID, "NoGoodRoute");
 					return tuple;
+				}
+				public String getResultType() {
+					return "NetworkPartitioned";
+				}
+				public String[] getResultAttributes() {
+					return attributes;
 				}
 			};
 
@@ -428,7 +448,7 @@ public class EWSN extends SNIFController {
 			int packetTracerID = 1;
 			int nodeStateChangeFilterID = 2;
 			NetworkPartitionDetection partitionDetection = new NetworkPartitionDetection(
-					theSink, 4 * epoch, 10 * 1000, nodeStateChangeFilterID, packetTracerID);
+					theSink, W * pathAdvPeriod, 10 * 1000, nodeStateChangeFilterID, packetTracerID);
 			packetTracer.subscribe( partitionDetection, packetTracerID);
 			nodeStateChangeFilter.subscribe( partitionDetection, nodeStateChangeFilterID);
 			partitionDetection.subscribe( metricStream, 0);
@@ -461,9 +481,9 @@ public class EWSN extends SNIFController {
 				}
 			};
 			linkAdvertisementMapper.subscribe( linkEnumeratorNeighbours, 0);
-			// metric: nr of times a neighbour was was reported last 2 epoch
+			// metric: nr of times a neighbour was was reported last ..
 			TupleTimeWindowGroupAggregator linkNeighboursLastEpoch =
-				new TupleTimeWindowGroupAggregator ( 2 * epoch, "linkID", new Counter( "LinkListed", "reports"),"linkNeighboursLastEpoch");
+				new TupleTimeWindowGroupAggregator ( W * linkAdvPeriod, "linkID", new Counter( "LinkListed", "reports"),"linkNeighboursLastEpoch");
 			linkEnumeratorNeighbours.subscribe(linkNeighboursLastEpoch , 0);
 
 			AbstractPipe<Tuple,Tuple> linkEnumeratorData = new AbstractPipe<Tuple,Tuple>() {
@@ -479,9 +499,9 @@ public class EWSN extends SNIFController {
 				}
 			};
 			packetTracer.subscribe( linkEnumeratorData, 0);
-			// metric: nr of times a packet was sent across a link last 2 epoch
+			// metric: nr of times a packet was sent across a link ..
 			TupleTimeWindowGroupAggregator linkDataLastEpoch =
-				new TupleTimeWindowGroupAggregator ( 2 * epoch, "linkID", new Counter( "LinkData", "reports"),"linkDataLastEpoch");
+				new TupleTimeWindowGroupAggregator (  W * dataPeriod, "linkID", new Counter( "LinkData", "reports"),"linkDataLastEpoch");
 			linkEnumeratorData.subscribe(linkDataLastEpoch , 0);
 
 			// connect to GUI
@@ -560,8 +580,8 @@ public class EWSN extends SNIFController {
 	 * @param metricStream
 	 * @param eventStream
 	 * @param nodeStateChangeFilter
-	 * @param linkNeighboursLastEpoch
-	 * @param linkDataLastEpoch
+	 * @param linkNeighboursCount
+	 * @param linkDataCount
 	 * @param seqNrMapper 
 	 * @param multiHopFilter 
 	 * @param pathAdvertisementMapper 
@@ -569,7 +589,7 @@ public class EWSN extends SNIFController {
 	 */
 	private static void createGuiSink(Filter<PacketTuple> dupFilter, Mapper linkAdvertisementMapper,
 			Union<Tuple> metricStream, Union<Tuple> eventStream, Filter<Tuple> nodeStateChangeFilter,
-			TupleTimeWindowGroupAggregator linkNeighboursLastEpoch, TupleTimeWindowGroupAggregator linkDataLastEpoch,
+			TupleTimeWindowGroupAggregator linkNeighboursCount, TupleTimeWindowGroupAggregator linkDataCount,
 			AbstractPipe<Tuple, Tuple> seqNrMapper, AbstractPipe<Tuple, Tuple> multiHopFilter,
 			AbstractPipe<Tuple, Tuple> pathAdvertisementMapper, AbstractPipe<Tuple, Tuple> linkBeaconFilter) {
 		// GUI
@@ -749,8 +769,8 @@ public class EWSN extends SNIFController {
 		linkAdvertisementMapper.subscribe(guiSink, 2);		
 		nodeStateChangeFilter.subscribe(guiSink,3);
 		eventStream.subscribe(guiSink, 4);
-		linkNeighboursLastEpoch.subscribe(guiSink, 5);
-		linkDataLastEpoch.subscribe(guiSink, 6);
+		linkNeighboursCount.subscribe(guiSink, 5);
+		linkDataCount.subscribe(guiSink, 6);
 		metricStream.subscribe(guiSink, 7);
 		seqNrMapper.subscribe(guiSink, 8);
 		pathAdvertisementMapper.subscribe(guiSink, 9);
