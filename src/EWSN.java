@@ -84,6 +84,14 @@ public class EWSN extends SNIFController {
 	288 , 313 , 340 , 382 , 387			
     };
 
+	// W 
+	int W = 10;
+	// respective periods
+	final int beaconPeriod = 10 * 1000;
+	final int linkAdvPeriod = 80 * 1000;
+	final int pathAdvPeriod = 80 * 1000;
+	final int dataPeriod = 30 * 1000;
+
 	private void setNodePositions() {
 		HashMap<Integer, Coordinates> nodePositions = new HashMap<Integer, Coordinates>();
 		// get position. 5 nodes per row. 160 / 4 = 40
@@ -136,390 +144,16 @@ public class EWSN extends SNIFController {
 		EWSN debugger = new EWSN();
 		debugger.setup();
 
-		// W 
-		int W = 10;
-		// respective periods
-		final int beaconPeriod  = 10 * 1000;
-		final int linkAdvPeriod = 80 * 1000;
-		final int pathAdvPeriod = 80 * 1000;
-		@SuppressWarnings("unused")
-		final int dataPeriod    = 30 * 1000;
-
 		while (true) {
 
-			// create crc filter
-			Predicate<PacketTuple> crcCheck = new PacketCrcPredicate(parser);
-			Filter<PacketTuple> crcFilter = new Filter<PacketTuple>( crcCheck ); 
-
-			// total bandwith aggregator
-			// AbstractSink<Tuple> totalDataAggregator = createTotalBandwidthAggregator();
-
-			// get overall observation quality
-			// TupleGroupAggregator totalObservationQuality = new TupleGroupAggregator( new Ratio ( "ObservationQuality", "seqNr"), "nodeID", "totalObservationQuality");
-			// seqNrMapper.subscribe( totalObservationQuality, 0 );
-
-			// metric: max path quality reported last 2 epochs
-			// TupleTimeWindowGroupAggregator maxPathQuality =
-			// 	new TupleTimeWindowGroupAggregator ( 2 * epoch, "nodeID", new Max( "MaxPathQuality", "quality"),"maxPathQuality");
-			// pathAdvertisementMapper.subscribe(maxPathQuality , 0);
-
-			// filter packets with identical content reported by different DSN nodes within short time (20 ms)
-			DistinctInWindow distinctInWindow = new DistinctInWindow(1000);
-			Filter<PacketTuple> dupFilter = new Filter<PacketTuple>(distinctInWindow);
-			crcFilter.subscribe(dupFilter, 0);
-
-			// extrac layer2 source
-			Mapper packetIdStream = new Mapper( "IDTuple", "bmac_msg_st.source", "nodeID");
-			dupFilter.subscribe( packetIdStream, 0);
-
-			// get linkBeacon tuple stream
-			Filter<Tuple> linkBeaconFilter = new Filter<Tuple>(
-					new AttributePredicate("ccc_packet_st.type", parser.getValue( "BEACON_TYPE")));
-			dupFilter.subscribe( linkBeaconFilter, 0);
-
-			// extract layer 2 source address and seqNr from beacons
-			Mapper seqNrMapper = new Mapper( "SeqNrTuple", "beacon_packet.node_id", "nodeID", "beacon_packet.seq_nr", "seqNr");
-			linkBeaconFilter.subscribe( seqNrMapper, 0);
-
-			// check for seq nr reset on beacon seq nr
-			SeqNrResetDetector seqResetDetector = new SeqNrResetDetector("nodeID",
-					"seqNr", WORD_MAX_VALUE, 10 );
-			seqNrMapper.subscribe(seqResetDetector, 0 );
-
-			// get linkAdvertisement tuple stream
-			Filter<Tuple> linkAdvertisementFilter = new Filter<Tuple>(
-					new AttributePredicate("ccc_packet_st.type", parser.getValue("ADVERT_TYPE")) ); 
-			dupFilter.subscribe( linkAdvertisementFilter, 0);
-
-			// translate LinkAdvertisementBeacons into Neighbour sightings
-			ArrayExtractor linkAdvertisementExtractor = new ArrayExtractor( "LinkQuality",
-					"advert_packet.neighbours.length", "advert_packet.neighbours", "advert_packet.node_id", "node_id", "quality");
-			linkAdvertisementFilter.subscribe( linkAdvertisementExtractor, 0);
-
-			// ignore empty entries
-			Filter<Tuple> neighbourTableFilter = new Filter<Tuple>(
-					new Predicate<Tuple>() {
-						final TupleAttribute nodeIDAttribute = new TupleAttribute("node_id");
-						public boolean invoke(Tuple o, long timestamp) {
-							return o.getIntAttribute(nodeIDAttribute) != 0;
-						}
-					});
-			linkAdvertisementExtractor.subscribe( neighbourTableFilter,0) ;
-			
-			// map fields for neighbour count operators
-			Mapper linkAdvertisementMapper = new Mapper( "NodeSeen" , "advert_packet.node_id", "reportingNode", "node_id", "seenNode");
-			neighbourTableFilter.subscribe( linkAdvertisementMapper, 0);
-
-			// get pathAdvertisementFilter tuple stream
-			Filter<Tuple> pathAdvertisementFilter = new Filter<Tuple>(
-					new AttributePredicate("ccc_packet_st.type", parser.getValue("DISTANCE_TYPE"))); 
-			dupFilter.subscribe( pathAdvertisementFilter, 0);
-
-			// extract path quality
-			Mapper pathAdvertisementMapper = new Mapper( "PathAnnouncement" , "distance_packet.node_id", "nodeID", "distance_packet.distance", "quality", "distance_packet.round_nr", "round");
-			pathAdvertisementFilter.subscribe( pathAdvertisementMapper, 0);
-
-			// get multiHopPacket stream
-			Filter<Tuple> multiHopFilter = new Filter<Tuple>(
-					new AttributePredicate("ccc_packet_st.type", parser.getValue("DATA_TYPE")) ); 
-			dupFilter.subscribe( multiHopFilter, 0);
-
-			AbstractPipe<Tuple, Tuple> packetTracer;
-			if (usePacketTracer) {
-				// get Tracer data directly from packet
-				// PacketTracer reports last node sending a packet before // HACK - l3src used as l3dst!
-				packetTracer = new PacketTupleTracer("PacketTracerTuple", "bmac_msg_st.destination", "data_packet.node_id", "data_packet.node_id", "data_packet.seq_nr");
-				multiHopFilter.subscribe( packetTracer, 0);
-			} else {
-				packetTracer = new Mapper ("PacketTracerTuple", "bmac_msg_st.source", "l2src", "bmac_msg_st.destination", "l2dst", "data_packet.node_id", "l3src");
-				multiHopFilter.subscribe(packetTracer, 0);
-			}
-			
-			// metric: number of packet received (W times beacon period) per node
-			TupleTimeWindowGroupAggregator packetCount =
-				new TupleTimeWindowGroupAggregator ( W * beaconPeriod , "nodeID", new Counter( "PacketsLastEpoch", "packets"),"packetsLastEpoch");
-			packetIdStream.subscribe( packetCount, 0);
-
-			// metric: number of valid route announcements ..e
-			TupleTimeWindowGroupAggregator pathAnnouncementsLastEpoch2 =
-				new TupleTimeWindowGroupAggregator ( W * pathAdvPeriod, "nodeID", new Counter( "RoutesLastEpoch", "routeAnnouncements"),"pathAnnouncementsLastEpoch");
-			pathAdvertisementMapper.subscribe(pathAnnouncementsLastEpoch2 , 0);
-
-			// metric: number of neighbours reported node ..
-			TupleTimeWindowDistinctGroupAggregator seenByNeighbours =
-				new TupleTimeWindowDistinctGroupAggregator ( W * linkAdvPeriod, new Counter("NeighbourReportsLastEpochTemp", "sightings"), "seenNode",
-						"reportingNode", "seenNode") ;
-			linkAdvertisementMapper.subscribe( seenByNeighbours, 0);
-
-			// use "seenNode" as "nodeID"
-			Mapper seenByNeighboursIDMapper = new Mapper( "NeighbourReportsLastEpoch", "seenNode", "nodeID", "sightings" , "sightings" );
-			seenByNeighbours.subscribe( seenByNeighboursIDMapper, 0);
-
-			// metric: number of neighbours seen by node node ..
-			TupleTimeWindowDistinctGroupAggregator neighboursSeen =
-				new TupleTimeWindowDistinctGroupAggregator ( W * linkAdvPeriod, new Counter("NeighbourSeenLastEpochTemp", "sightings"), "reportingNode",
-						"reportingNode", "seenNode");
-			linkAdvertisementMapper.subscribe( neighboursSeen, 0);
-
-			// use "reportingNode" as "nodeID"
-			Mapper neighboursSeenLastEpochIDMapper = new Mapper( "NeighbourSeenLastEpoch", "reportingNode", "nodeID", "sightings", "sightings" );
-			neighboursSeen.subscribe( neighboursSeenLastEpochIDMapper, 0);
-
-			// Route analyzer: detects "GoodRoute"s, "RoutingLoop" and performs "LatencyMeasurement"
-			AbstractPipe<Tuple,Tuple> routeAnalyzer = new RouteAnalyzer(theSink);
-			packetTracer.subscribe( routeAnalyzer, 0);
-
-			// get LatencyMeasurement measurements (?)
-			Filter<Tuple> goodRouteFilter = new Filter<Tuple>(
-					new AttributePredicate("TupleType",  "LatencyMeasurement" )); 
-			routeAnalyzer.subscribe( goodRouteFilter, 0);
-
-			// metric: nr of good route reports ..
-			TupleTimeWindowGroupAggregator goodRouteReports =
-				new TupleTimeWindowGroupAggregator ( W * dataPeriod, "nodeID", new Counter( "GoodRoute", "reports"),"goodRouteReports");
-			goodRouteFilter.subscribe(goodRouteReports , 0);
-
-			// get RoutingLoop detections
-			Filter<Tuple> routingLoopFilter = new Filter<Tuple>(
-					new AttributePredicate("TupleType",  "RoutingLoop" )); 
-			routeAnalyzer.subscribe( routingLoopFilter, 0);
-
-			// metric: nr of routing loops ..
-			TupleTimeWindowGroupAggregator routingLoopReports =
-				new TupleTimeWindowGroupAggregator ( W * dataPeriod, "nodeID", new Counter( "RoutingLoops", "reports"),"routingLoopReports");
-			routingLoopFilter.subscribe(routingLoopReports , 0);
-
-			// get observation quality ..
-			TupleTimeWindowDistinctGroupAggregator observationQuality = new TupleTimeWindowDistinctGroupAggregator
-			( W * beaconPeriod, new Ratio ( "ObservationQuality", "seqNr"), "nodeID", "nodeID", "seqNr") ;
-			seqNrMapper.subscribe( observationQuality, 0 );
-			
-			// reboots last epoch
-			TupleTimeWindowGroupAggregator rebootCount =
-				new TupleTimeWindowGroupAggregator ( W * beaconPeriod, "nodeID", new Counter( "RebootsLastEpoch", "reboots"),"rebootsLastEpoch");
-			seqResetDetector.subscribe(rebootCount , 0);
-			
-			// get all metric streams
-			Union<Tuple> metricStream = new Union<Tuple>();
-			packetCount.subscribe( metricStream, 0);
-			seenByNeighboursIDMapper.subscribe( metricStream, 0);
-			neighboursSeenLastEpochIDMapper.subscribe( metricStream, 0);
-			pathAnnouncementsLastEpoch2.subscribe(metricStream,0);
-			goodRouteReports.subscribe( metricStream, 0);
-			routingLoopReports.subscribe( metricStream, 0);
-			// maxPathQuality.subscribe( metricStream, 0);
-			observationQuality.subscribe( metricStream, 0);
-			rebootCount.subscribe(metricStream, 0);
-			
-			// get all event streams
-			Union<Tuple> eventStream = new Union<Tuple>();
-			seqResetDetector.subscribe( eventStream, 0);
-			// TODO latencyObservator.subscribe( eventStream, 0 );
-
-			BinaryDecisionTree noPacketReceivedTest = new BinaryDecisionTree( new TreeAttributePredicate(
-					"PacketsLastEpoch", "packets", TreeAttributePredicate.Comparator.equal, 0));
-			BinaryDecisionTree noPacketReceivedTest2 = new BinaryDecisionTree( new TreeAttributePredicate(
-					"PacketsLastEpoch", "packets", TreeAttributePredicate.Comparator.equal, 0));
-			BinaryDecisionTree coveredTest = new BinaryDecisionTree( new TreeAttributePredicate(
-					"ObservationQuality", "ratio", TreeAttributePredicate.Comparator2.greater, 0.7f));
-			// BinaryDecisionTree noWitnessTest = new BinaryDecisionTree( new TreeAttributePredicate(
-			//		"NeighbourReportsLastEpoch", "sightings", TreeAttributePredicate.Comparator.equal, 0));
-			BinaryDecisionTree noNeighboursTest = new BinaryDecisionTree( new TreeAttributePredicate(
-					"NeighbourSeenLastEpoch", "sightings", TreeAttributePredicate.Comparator.equal, 0));
-			BinaryDecisionTree networkPartitionTestB = new BinaryDecisionTree( new TreeAttributePredicate(
-					"NodePartitioned", "partitioned", TreeAttributePredicate.Comparator.equal, 1));
-			BinaryDecisionTree networkPartitionTestC = new BinaryDecisionTree( new TreeAttributePredicate(
-					"NodePartitioned", "partitioned", TreeAttributePredicate.Comparator.equal, 1));
-			BinaryDecisionTree noPathTest = new BinaryDecisionTree( new TreeAttributePredicate(
-					"RoutesLastEpoch", "routeAnnouncements", TreeAttributePredicate.Comparator.equal, 0));
-			BinaryDecisionTree noGoodRouteTest = new BinaryDecisionTree( new TreeAttributePredicate(
-					"GoodRoute", "reports", TreeAttributePredicate.Comparator.equal, 0));
-			BinaryDecisionTree routingLoopTest = new BinaryDecisionTree( new TreeAttributePredicate(
-					"RoutingLoops", "reports", TreeAttributePredicate.Comparator.greater, 0));
-			BinaryDecisionTree noRebootsTest = new BinaryDecisionTree( new TreeAttributePredicate(
-					"RebootsLastEpoch", "reboots", TreeAttributePredicate.Comparator.equal, 0));
-			BinaryDecisionTree nodeCrash = BinaryDecisionTree.createTupleResultNode ("NodeCrash");
-			BinaryDecisionTree nodeOK = BinaryDecisionTree.createTupleResultNode ("NodeOK");
-			BinaryDecisionTree sinkTest = new BinaryDecisionTree( new TreeAttributePredicate(
-					"PacketsLastEpoch", "nodeID", TreeAttributePredicate.Comparator.equal, theSinkID));
-			BinaryDecisionTree waitingPackets = BinaryDecisionTree.createTupleResultNode("WaitingPackets");
-			BinaryDecisionTree waitingNeighbours = BinaryDecisionTree.createTupleResultNode("WaitingNeighbours");
-			BinaryDecisionTree waitingPath = BinaryDecisionTree.createTupleResultNode("WaitingPath");
-			BinaryDecisionTree waitingRoute = BinaryDecisionTree.createTupleResultNode("WaitingRoute");
-			BinaryDecisionTree notCovert = BinaryDecisionTree.createTupleResultNode("NotCovert");
-
-			// result: NetworkPartitioned 
-			BinaryDecisionTree networkPartitionNoPath = new BinaryDecisionTree () {
-				final TupleAttribute crashedID = new TupleAttribute("crashedNodes");
-				final TupleAttribute resultID = new TupleAttribute("result");
-				final String [] attributes = new String [] { "crashedNodes","result" };
-				public Tuple invoke( HashMap<Object,Tuple> input) {
-					Tuple tuple = Tuple.createTuple("NetworkPartitioned");
-					tuple.setStringAttribute(crashedID, input.get("NodePartitioned").getStringAttribute(crashedID));
-					tuple.setStringAttribute(resultID, "NoParent");
-					return tuple;
-				}
-				public String getResultType() {
-					return "NetworkPartitioned";
-				}
-				public String[] getResultAttributes() {
-					return attributes;
-				}
-			};
-			
-			// result: NetworkParitioned
-			BinaryDecisionTree networkPartitionNoGoodRoute = new BinaryDecisionTree () {
-				final TupleAttribute crashedID = new TupleAttribute("crashedNodes");
-				final TupleAttribute resultID = new TupleAttribute("result");
-				final String [] attributes = new String [] { "crashedNodes","result" };
-				public Tuple invoke( HashMap<Object,Tuple> input) {
-					Tuple tuple = Tuple.createTuple("NetworkPartitioned");
-					tuple.setStringAttribute(crashedID, input.get("NodePartitioned").getStringAttribute(crashedID));
-					tuple.setStringAttribute(resultID, "NoGoodRoute");
-					return tuple;
-				}
-				public String getResultType() {
-					return "NetworkPartitioned";
-				}
-				public String[] getResultAttributes() {
-					return attributes;
-				}
-			};
-
-			coveredTest.setTrue( noPacketReceivedTest );
-			coveredTest.setFalse( noPacketReceivedTest2 );
-			
-			noPacketReceivedTest.setTrue ( nodeCrash );
-			noPacketReceivedTest.setFalse (  noRebootsTest );
-			noPacketReceivedTest.setDefault( waitingPackets );
-			
-			noRebootsTest.setFalse( BinaryDecisionTree.createTupleResultNode("NodeReboot"));
-			noRebootsTest.setTrue( sinkTest);
-			noRebootsTest.setDefault(sinkTest);
-
-			sinkTest.setTrue(nodeOK);
-			sinkTest.setFalse(noGoodRouteTest);
-
-			noGoodRouteTest.setFalse(BinaryDecisionTree.createTupleResultNode ("NodeOK") );
-			noGoodRouteTest.setTrue( noNeighboursTest );
-			noGoodRouteTest.setDefault( waitingRoute );
-
-			noNeighboursTest.setFalse( noPathTest );
-			noNeighboursTest.setTrue( BinaryDecisionTree.createTupleResultNode ("NoNeighbours") );
-			noNeighboursTest.setDefault( waitingNeighbours );
-
-			// no path (incl. network part test)
-			noPathTest.setFalse( networkPartitionTestC ); // next test
-			noPathTest.setTrue( networkPartitionTestB );
-			noPathTest.setDefault ( waitingPath );
-
-			networkPartitionTestB.setTrue( networkPartitionNoPath );
-			networkPartitionTestB.setFalse(    BinaryDecisionTree.createTupleResultNode ("NoParent"));
-			networkPartitionTestB.setDefault(  BinaryDecisionTree.createTupleResultNode ("NoParent") );
-			
-			// network partition test
-			networkPartitionTestC.setTrue( networkPartitionNoGoodRoute );
-			networkPartitionTestC.setFalse(    routingLoopTest);
-			networkPartitionTestC.setDefault(  routingLoopTest );
-
-			// routing loop
-			routingLoopTest.setTrue(BinaryDecisionTree.createTupleResultNode ("RoutingFailureLoop") );
-			routingLoopTest.setDefault(BinaryDecisionTree.createTupleResultNode ("RoutingFailureGeneral") );
-			routingLoopTest.setFalse(BinaryDecisionTree.createTupleResultNode ("RoutingFailureGeneral") );
-			
-			// Not Covert - if good route OK, otherwise complain
-			// noGoodRouteTest2.setTrue( BinaryDecisionTree.createTupleResultNode ("NodeOK"));
-			// noGoodRouteTest2.setFalse(notCovert);
-			// noGoodRouteTest2.setDefault(notCovert);
-			noPacketReceivedTest2.setTrue( nodeCrash);
-			noPacketReceivedTest2.setFalse( notCovert);
-			noPacketReceivedTest2.setDefault( notCovert);
-			
-			// end of tree
-			
-			GroupingEvaluator stateDetector = GroupingEvaluator.createBinaryTreeEvaluator(coveredTest, "nodeID","stateDetector");
-			metricStream.subscribe( stateDetector , 0);
-
-			// get node state changes
-			Filter<Tuple> nodeStateChangeFilter = new Filter<Tuple>( new TupleChangePredicate("nodeID"));
-			stateDetector.subscribe( nodeStateChangeFilter, 0);
-
-			// network partition detetction
-			int packetTracerID = 1;
-			int nodeStateChangeFilterID = 2;
-			NetworkPartitionDetection partitionDetection = new NetworkPartitionDetection(
-					theSink, W * pathAdvPeriod, 10 * 1000, nodeStateChangeFilterID, packetTracerID);
-			packetTracer.subscribe( partitionDetection, packetTracerID);
-			nodeStateChangeFilter.subscribe( partitionDetection, nodeStateChangeFilterID);
-			partitionDetection.subscribe( metricStream, 0);
-
-			// log to file
-			AbstractSink<Tuple> logger = new AbstractSink<Tuple>() {
-				public void process(Tuple o, int srcID, long timestamp) {
-					logLine( dsnLogWriter, "" + timestamp/1000 + " -- " + o.toString() );
-				}
-			};
-			nodeStateChangeFilter.subscribe( logger, 0);
-			eventStream.subscribe(logger, 0);
-
-			// metricStream.subscribe(logger, 0);
-			// routeAnalyzer.subscribe(logger, 0);
-			// packetTupleMapper.subscribe(logger, 0);		
-
-			// map "from", "to" -> "linkID=from#to
-			Tuple.registerTupleType( "LinkTuple", "linkID");
-			AbstractPipe<Tuple,Tuple> linkEnumeratorNeighbours = new AbstractPipe<Tuple,Tuple>() {
-				final TupleAttribute idField = new TupleAttribute("linkID");
-				final TupleAttribute fromAttribute = new TupleAttribute("reportingNode");
-				final TupleAttribute toAttribute = new TupleAttribute("seenNode");
-				public void process(Tuple o, int srcID, long timestamp) {
-					int from = o.getIntAttribute(fromAttribute);
-					int to = o.getIntAttribute(toAttribute);
-					Tuple tuple = Tuple.createTuple("LinkTuple");
-					tuple.setAttribute(idField, "" + from + "#" + to);
-					transfer( tuple, timestamp);
-				}
-			};
-			linkAdvertisementMapper.subscribe( linkEnumeratorNeighbours, 0);
-			// metric: nr of times a neighbour was was reported last ..
-			TupleTimeWindowGroupAggregator linkNeighboursLastEpoch =
-				new TupleTimeWindowGroupAggregator ( W * linkAdvPeriod, "linkID", new Counter( "LinkListed", "reports"),"linkNeighboursLastEpoch");
-			linkEnumeratorNeighbours.subscribe(linkNeighboursLastEpoch , 0);
-
-			AbstractPipe<Tuple,Tuple> linkEnumeratorData = new AbstractPipe<Tuple,Tuple>() {
-				final TupleAttribute idField = new TupleAttribute("linkID");
-				final TupleAttribute l2srcAttribute = new TupleAttribute("l2src");
-				final TupleAttribute l2dstAttribute = new TupleAttribute("l2dst");
-				public void process(Tuple o, int srcID, long timestamp) {
-					int from = o.getIntAttribute(l2srcAttribute);
-					int to = o.getIntAttribute(l2dstAttribute);
-					Tuple tuple = Tuple.createTuple("LinkTuple");
-					tuple.setAttribute(idField, "" + from + "#" + to);
-					transfer( tuple, timestamp);
-				}
-			};
-			packetTracer.subscribe( linkEnumeratorData, 0);
-			// metric: nr of times a packet was sent across a link ..
-			TupleTimeWindowGroupAggregator linkDataLastEpoch =
-				new TupleTimeWindowGroupAggregator (  W * dataPeriod, "linkID", new Counter( "LinkData", "reports"),"linkDataLastEpoch");
-			linkEnumeratorData.subscribe(linkDataLastEpoch , 0);
-
-			// connect to GUI
-			createGuiSink(dupFilter, linkAdvertisementMapper, metricStream, eventStream, nodeStateChangeFilter,
-					linkNeighboursLastEpoch, linkDataLastEpoch, seqNrMapper, multiHopFilter,
-					pathAdvertisementMapper, linkBeaconFilter);
-			Scheduler.registerClockView( new TimeTriggered() {
-				public void handleTimerEvent(long timestamp) {
-					view.setTime( ""+(timestamp / 1000)+ " s");
-				}
-			});
-
-			// --- let's wait for user..
-
+			// --- let's wait for user first..
 			debugger.start = new Object();
 			synchronized(debugger.start) {
 				debugger.start.wait();
 			}
+			
+			// -- create whole graph and connect to GUI
+			Filter<PacketTuple> crcFilter = debugger.createAnalysisGraph();
 
 			System.out.println( "ewsn snif demo started..");
 
@@ -572,6 +206,461 @@ public class EWSN extends SNIFController {
 			// update GUI
 			view.simulationStopped();
 		}
+	}
+
+	/**
+	 * @return
+	 */
+	private Filter<PacketTuple> createAnalysisGraph() {
+
+		// create crc filter
+		Predicate<PacketTuple> crcCheck = new PacketCrcPredicate(parser);
+		Filter<PacketTuple> crcFilter = new Filter<PacketTuple>(crcCheck);
+
+		// total bandwith aggregator
+		// AbstractSink<Tuple> totalDataAggregator = createTotalBandwidthAggregator();
+
+		// get overall observation quality
+		// TupleGroupAggregator totalObservationQuality = new TupleGroupAggregator( new Ratio ( "ObservationQuality", "seqNr"), "nodeID", "totalObservationQuality");
+		// seqNrMapper.subscribe( totalObservationQuality, 0 );
+
+		// metric: max path quality reported last 2 epochs
+		// TupleTimeWindowGroupAggregator maxPathQuality =
+		// 	new TupleTimeWindowGroupAggregator ( 2 * epoch, "nodeID", new Max( "MaxPathQuality", "quality"),"maxPathQuality");
+		// pathAdvertisementMapper.subscribe(maxPathQuality , 0);
+
+		// filter packets with identical content reported by different DSN nodes within short time (20 ms)
+		DistinctInWindow distinctInWindow = new DistinctInWindow(1000);
+		Filter<PacketTuple> dupFilter = new Filter<PacketTuple>(
+				distinctInWindow);
+		crcFilter.subscribe(dupFilter, 0);
+
+		// extrac layer2 source
+		Mapper packetIdStream = new Mapper("IDTuple", "bmac_msg_st.source",
+				"nodeID");
+		dupFilter.subscribe(packetIdStream, 0);
+
+		// get linkBeacon tuple stream
+		Filter<Tuple> linkBeaconFilter = new Filter<Tuple>(
+				new AttributePredicate("ccc_packet_st.type", parser
+						.getValue("BEACON_TYPE")));
+		dupFilter.subscribe(linkBeaconFilter, 0);
+
+		// extract layer 2 source address and seqNr from beacons
+		Mapper seqNrMapper = new Mapper("SeqNrTuple", "beacon_packet.node_id",
+				"nodeID", "beacon_packet.seq_nr", "seqNr");
+		linkBeaconFilter.subscribe(seqNrMapper, 0);
+
+		// check for seq nr reset on beacon seq nr
+		SeqNrResetDetector seqResetDetector = new SeqNrResetDetector("nodeID",
+				"seqNr", WORD_MAX_VALUE, 10);
+		seqNrMapper.subscribe(seqResetDetector, 0);
+
+		// get linkAdvertisement tuple stream
+		Filter<Tuple> linkAdvertisementFilter = new Filter<Tuple>(
+				new AttributePredicate("ccc_packet_st.type", parser
+						.getValue("ADVERT_TYPE")));
+		dupFilter.subscribe(linkAdvertisementFilter, 0);
+
+		// translate LinkAdvertisementBeacons into Neighbour sightings
+		ArrayExtractor linkAdvertisementExtractor = new ArrayExtractor(
+				"LinkQuality", "advert_packet.neighbours.length",
+				"advert_packet.neighbours", "advert_packet.node_id", "node_id",
+				"quality");
+		linkAdvertisementFilter.subscribe(linkAdvertisementExtractor, 0);
+
+		// ignore empty entries
+		Filter<Tuple> neighbourTableFilter = new Filter<Tuple>(
+				new Predicate<Tuple>() {
+					final TupleAttribute nodeIDAttribute = new TupleAttribute(
+							"node_id");
+
+					public boolean invoke(Tuple o, long timestamp) {
+						return o.getIntAttribute(nodeIDAttribute) != 0;
+					}
+				});
+		linkAdvertisementExtractor.subscribe(neighbourTableFilter, 0);
+
+		// map fields for neighbour count operators
+		Mapper linkAdvertisementMapper = new Mapper("NodeSeen",
+				"advert_packet.node_id", "reportingNode", "node_id", "seenNode");
+		neighbourTableFilter.subscribe(linkAdvertisementMapper, 0);
+
+		// get pathAdvertisementFilter tuple stream
+		Filter<Tuple> pathAdvertisementFilter = new Filter<Tuple>(
+				new AttributePredicate("ccc_packet_st.type", parser
+						.getValue("DISTANCE_TYPE")));
+		dupFilter.subscribe(pathAdvertisementFilter, 0);
+
+		// extract path quality
+		Mapper pathAdvertisementMapper = new Mapper("PathAnnouncement",
+				"distance_packet.node_id", "nodeID",
+				"distance_packet.distance", "quality",
+				"distance_packet.round_nr", "round");
+		pathAdvertisementFilter.subscribe(pathAdvertisementMapper, 0);
+
+		// get multiHopPacket stream
+		Filter<Tuple> multiHopFilter = new Filter<Tuple>(
+				new AttributePredicate("ccc_packet_st.type", parser
+						.getValue("DATA_TYPE")));
+		dupFilter.subscribe(multiHopFilter, 0);
+
+		AbstractPipe<Tuple, Tuple> packetTracer;
+		if (usePacketTracer) {
+			// get Tracer data directly from packet
+			// PacketTracer reports last node sending a packet before // HACK - l3src used as l3dst!
+			packetTracer = new PacketTupleTracer("PacketTracerTuple",
+					"bmac_msg_st.destination", "data_packet.node_id",
+					"data_packet.node_id", "data_packet.seq_nr");
+			multiHopFilter.subscribe(packetTracer, 0);
+		} else {
+			packetTracer = new Mapper("PacketTracerTuple",
+					"bmac_msg_st.source", "l2src", "bmac_msg_st.destination",
+					"l2dst", "data_packet.node_id", "l3src");
+			multiHopFilter.subscribe(packetTracer, 0);
+		}
+
+		// metric: number of packet received (W times beacon period) per node
+		TupleTimeWindowGroupAggregator packetCount = new TupleTimeWindowGroupAggregator(
+				W * beaconPeriod, "nodeID", new Counter("PacketsLastEpoch",
+						"packets"), "packetsLastEpoch");
+		packetIdStream.subscribe(packetCount, 0);
+
+		// metric: number of valid route announcements ..e
+		TupleTimeWindowGroupAggregator pathAnnouncementsLastEpoch2 = new TupleTimeWindowGroupAggregator(
+				W * pathAdvPeriod, "nodeID", new Counter("RoutesLastEpoch",
+						"routeAnnouncements"), "pathAnnouncementsLastEpoch");
+		pathAdvertisementMapper.subscribe(pathAnnouncementsLastEpoch2, 0);
+
+		// metric: number of neighbours reported node ..
+		TupleTimeWindowDistinctGroupAggregator seenByNeighbours = new TupleTimeWindowDistinctGroupAggregator(
+				W * linkAdvPeriod, new Counter("NeighbourReportsLastEpochTemp",
+						"sightings"), "seenNode", "reportingNode", "seenNode");
+		linkAdvertisementMapper.subscribe(seenByNeighbours, 0);
+
+		// use "seenNode" as "nodeID"
+		Mapper seenByNeighboursIDMapper = new Mapper(
+				"NeighbourReportsLastEpoch", "seenNode", "nodeID", "sightings",
+				"sightings");
+		seenByNeighbours.subscribe(seenByNeighboursIDMapper, 0);
+
+		// metric: number of neighbours seen by node node ..
+		TupleTimeWindowDistinctGroupAggregator neighboursSeen = new TupleTimeWindowDistinctGroupAggregator(
+				W * linkAdvPeriod, new Counter("NeighbourSeenLastEpochTemp",
+						"sightings"), "reportingNode", "reportingNode",
+				"seenNode");
+		linkAdvertisementMapper.subscribe(neighboursSeen, 0);
+
+		// use "reportingNode" as "nodeID"
+		Mapper neighboursSeenLastEpochIDMapper = new Mapper(
+				"NeighbourSeenLastEpoch", "reportingNode", "nodeID",
+				"sightings", "sightings");
+		neighboursSeen.subscribe(neighboursSeenLastEpochIDMapper, 0);
+
+		// Route analyzer: detects "GoodRoute"s, "RoutingLoop" and performs "LatencyMeasurement"
+		AbstractPipe<Tuple, Tuple> routeAnalyzer = new RouteAnalyzer(theSink);
+		packetTracer.subscribe(routeAnalyzer, 0);
+
+		// get LatencyMeasurement measurements (?)
+		Filter<Tuple> goodRouteFilter = new Filter<Tuple>(
+				new AttributePredicate("TupleType", "LatencyMeasurement"));
+		routeAnalyzer.subscribe(goodRouteFilter, 0);
+
+		// metric: nr of good route reports ..
+		TupleTimeWindowGroupAggregator goodRouteReports = new TupleTimeWindowGroupAggregator(
+				W * dataPeriod, "nodeID", new Counter("GoodRoute", "reports"),
+				"goodRouteReports");
+		goodRouteFilter.subscribe(goodRouteReports, 0);
+
+		// get RoutingLoop detections
+		Filter<Tuple> routingLoopFilter = new Filter<Tuple>(
+				new AttributePredicate("TupleType", "RoutingLoop"));
+		routeAnalyzer.subscribe(routingLoopFilter, 0);
+
+		// metric: nr of routing loops ..
+		TupleTimeWindowGroupAggregator routingLoopReports = new TupleTimeWindowGroupAggregator(
+				W * dataPeriod, "nodeID",
+				new Counter("RoutingLoops", "reports"), "routingLoopReports");
+		routingLoopFilter.subscribe(routingLoopReports, 0);
+
+		// get observation quality ..
+		TupleTimeWindowDistinctGroupAggregator observationQuality = new TupleTimeWindowDistinctGroupAggregator(
+				W * beaconPeriod, new Ratio("ObservationQuality", "seqNr"),
+				"nodeID", "nodeID", "seqNr");
+		seqNrMapper.subscribe(observationQuality, 0);
+
+		// reboots last epoch
+		TupleTimeWindowGroupAggregator rebootCount = new TupleTimeWindowGroupAggregator(
+				W * beaconPeriod, "nodeID", new Counter("RebootsLastEpoch",
+						"reboots"), "rebootsLastEpoch");
+		seqResetDetector.subscribe(rebootCount, 0);
+
+		// get all metric streams
+		Union<Tuple> metricStream = new Union<Tuple>();
+		packetCount.subscribe(metricStream, 0);
+		seenByNeighboursIDMapper.subscribe(metricStream, 0);
+		neighboursSeenLastEpochIDMapper.subscribe(metricStream, 0);
+		pathAnnouncementsLastEpoch2.subscribe(metricStream, 0);
+		goodRouteReports.subscribe(metricStream, 0);
+		routingLoopReports.subscribe(metricStream, 0);
+		// maxPathQuality.subscribe( metricStream, 0);
+		observationQuality.subscribe(metricStream, 0);
+		rebootCount.subscribe(metricStream, 0);
+
+		// get all event streams
+		Union<Tuple> eventStream = new Union<Tuple>();
+		seqResetDetector.subscribe(eventStream, 0);
+		// TODO latencyObservator.subscribe( eventStream, 0 );
+
+		BinaryDecisionTree noPacketReceivedTest = new BinaryDecisionTree(
+				new TreeAttributePredicate("PacketsLastEpoch", "packets",
+						TreeAttributePredicate.Comparator.equal, 0));
+		BinaryDecisionTree noPacketReceivedTest2 = new BinaryDecisionTree(
+				new TreeAttributePredicate("PacketsLastEpoch", "packets",
+						TreeAttributePredicate.Comparator.equal, 0));
+		BinaryDecisionTree coveredTest = new BinaryDecisionTree(
+				new TreeAttributePredicate("ObservationQuality", "ratio",
+						TreeAttributePredicate.Comparator2.greater, 0.7f));
+		// BinaryDecisionTree noWitnessTest = new BinaryDecisionTree( new TreeAttributePredicate(
+		//		"NeighbourReportsLastEpoch", "sightings", TreeAttributePredicate.Comparator.equal, 0));
+		BinaryDecisionTree noNeighboursTest = new BinaryDecisionTree(
+				new TreeAttributePredicate("NeighbourSeenLastEpoch",
+						"sightings", TreeAttributePredicate.Comparator.equal, 0));
+		BinaryDecisionTree networkPartitionTestB = new BinaryDecisionTree(
+				new TreeAttributePredicate("NodePartitioned", "partitioned",
+						TreeAttributePredicate.Comparator.equal, 1));
+		BinaryDecisionTree networkPartitionTestC = new BinaryDecisionTree(
+				new TreeAttributePredicate("NodePartitioned", "partitioned",
+						TreeAttributePredicate.Comparator.equal, 1));
+		BinaryDecisionTree noPathTest = new BinaryDecisionTree(
+				new TreeAttributePredicate("RoutesLastEpoch",
+						"routeAnnouncements",
+						TreeAttributePredicate.Comparator.equal, 0));
+		BinaryDecisionTree noGoodRouteTest = new BinaryDecisionTree(
+				new TreeAttributePredicate("GoodRoute", "reports",
+						TreeAttributePredicate.Comparator.equal, 0));
+		BinaryDecisionTree routingLoopTest = new BinaryDecisionTree(
+				new TreeAttributePredicate("RoutingLoops", "reports",
+						TreeAttributePredicate.Comparator.greater, 0));
+		BinaryDecisionTree noRebootsTest = new BinaryDecisionTree(
+				new TreeAttributePredicate("RebootsLastEpoch", "reboots",
+						TreeAttributePredicate.Comparator.equal, 0));
+		BinaryDecisionTree nodeCrash = BinaryDecisionTree
+				.createTupleResultNode("NodeCrash");
+		BinaryDecisionTree nodeOK = BinaryDecisionTree
+				.createTupleResultNode("NodeOK");
+		BinaryDecisionTree sinkTest = new BinaryDecisionTree(
+				new TreeAttributePredicate("PacketsLastEpoch", "nodeID",
+						TreeAttributePredicate.Comparator.equal, theSinkID));
+		BinaryDecisionTree waitingPackets = BinaryDecisionTree
+				.createTupleResultNode("WaitingPackets");
+		BinaryDecisionTree waitingNeighbours = BinaryDecisionTree
+				.createTupleResultNode("WaitingNeighbours");
+		BinaryDecisionTree waitingPath = BinaryDecisionTree
+				.createTupleResultNode("WaitingPath");
+		BinaryDecisionTree waitingRoute = BinaryDecisionTree
+				.createTupleResultNode("WaitingRoute");
+		BinaryDecisionTree notCovert = BinaryDecisionTree
+				.createTupleResultNode("NotCovert");
+
+		// result: NetworkPartitioned 
+		BinaryDecisionTree networkPartitionNoPath = new BinaryDecisionTree() {
+			final TupleAttribute crashedID = new TupleAttribute("crashedNodes");
+
+			final TupleAttribute resultID = new TupleAttribute("result");
+
+			final String[] attributes = new String[] { "crashedNodes", "result" };
+
+			public Tuple invoke(HashMap<Object, Tuple> input) {
+				Tuple tuple = Tuple.createTuple("NetworkPartitioned");
+				tuple.setStringAttribute(crashedID, input
+						.get("NodePartitioned").getStringAttribute(crashedID));
+				tuple.setStringAttribute(resultID, "NoParent");
+				return tuple;
+			}
+
+			public String getResultType() {
+				return "NetworkPartitioned";
+			}
+
+			public String[] getResultAttributes() {
+				return attributes;
+			}
+		};
+
+		// result: NetworkParitioned
+		BinaryDecisionTree networkPartitionNoGoodRoute = new BinaryDecisionTree() {
+			final TupleAttribute crashedID = new TupleAttribute("crashedNodes");
+
+			final TupleAttribute resultID = new TupleAttribute("result");
+
+			final String[] attributes = new String[] { "crashedNodes", "result" };
+
+			public Tuple invoke(HashMap<Object, Tuple> input) {
+				Tuple tuple = Tuple.createTuple("NetworkPartitioned");
+				tuple.setStringAttribute(crashedID, input
+						.get("NodePartitioned").getStringAttribute(crashedID));
+				tuple.setStringAttribute(resultID, "NoGoodRoute");
+				return tuple;
+			}
+
+			public String getResultType() {
+				return "NetworkPartitioned";
+			}
+
+			public String[] getResultAttributes() {
+				return attributes;
+			}
+		};
+
+		coveredTest.setTrue(noPacketReceivedTest);
+		coveredTest.setFalse(noPacketReceivedTest2);
+
+		noPacketReceivedTest.setTrue(nodeCrash);
+		noPacketReceivedTest.setFalse(noRebootsTest);
+		noPacketReceivedTest.setDefault(waitingPackets);
+
+		noRebootsTest.setFalse(BinaryDecisionTree
+				.createTupleResultNode("NodeReboot"));
+		noRebootsTest.setTrue(sinkTest);
+		noRebootsTest.setDefault(sinkTest);
+
+		sinkTest.setTrue(nodeOK);
+		sinkTest.setFalse(noGoodRouteTest);
+
+		noGoodRouteTest.setFalse(BinaryDecisionTree
+				.createTupleResultNode("NodeOK"));
+		noGoodRouteTest.setTrue(noNeighboursTest);
+		noGoodRouteTest.setDefault(waitingRoute);
+
+		noNeighboursTest.setFalse(noPathTest);
+		noNeighboursTest.setTrue(BinaryDecisionTree
+				.createTupleResultNode("NoNeighbours"));
+		noNeighboursTest.setDefault(waitingNeighbours);
+
+		// no path (incl. network part test)
+		noPathTest.setFalse(networkPartitionTestC); // next test
+		noPathTest.setTrue(networkPartitionTestB);
+		noPathTest.setDefault(waitingPath);
+
+		networkPartitionTestB.setTrue(networkPartitionNoPath);
+		networkPartitionTestB.setFalse(BinaryDecisionTree
+				.createTupleResultNode("NoParent"));
+		networkPartitionTestB.setDefault(BinaryDecisionTree
+				.createTupleResultNode("NoParent"));
+
+		// network partition test
+		networkPartitionTestC.setTrue(networkPartitionNoGoodRoute);
+		networkPartitionTestC.setFalse(routingLoopTest);
+		networkPartitionTestC.setDefault(routingLoopTest);
+
+		// routing loop
+		routingLoopTest.setTrue(BinaryDecisionTree
+				.createTupleResultNode("RoutingFailureLoop"));
+		routingLoopTest.setDefault(BinaryDecisionTree
+				.createTupleResultNode("RoutingFailureGeneral"));
+		routingLoopTest.setFalse(BinaryDecisionTree
+				.createTupleResultNode("RoutingFailureGeneral"));
+
+		// Not Covert - if good route OK, otherwise complain
+		// noGoodRouteTest2.setTrue( BinaryDecisionTree.createTupleResultNode ("NodeOK"));
+		// noGoodRouteTest2.setFalse(notCovert);
+		// noGoodRouteTest2.setDefault(notCovert);
+		noPacketReceivedTest2.setTrue(nodeCrash);
+		noPacketReceivedTest2.setFalse(notCovert);
+		noPacketReceivedTest2.setDefault(notCovert);
+
+		// end of tree
+
+		GroupingEvaluator stateDetector = GroupingEvaluator
+				.createBinaryTreeEvaluator(coveredTest, "nodeID",
+						"stateDetector");
+		metricStream.subscribe(stateDetector, 0);
+
+		// get node state changes
+		Filter<Tuple> nodeStateChangeFilter = new Filter<Tuple>(
+				new TupleChangePredicate("nodeID"));
+		stateDetector.subscribe(nodeStateChangeFilter, 0);
+
+		// network partition detetction
+		int packetTracerID = 1;
+		int nodeStateChangeFilterID = 2;
+		NetworkPartitionDetection partitionDetection = new NetworkPartitionDetection(
+				theSink, W * pathAdvPeriod, 10 * 1000, nodeStateChangeFilterID,
+				packetTracerID);
+		packetTracer.subscribe(partitionDetection, packetTracerID);
+		nodeStateChangeFilter.subscribe(partitionDetection,
+				nodeStateChangeFilterID);
+		partitionDetection.subscribe(metricStream, 0);
+
+		// log to file
+		AbstractSink<Tuple> logger = new AbstractSink<Tuple>() {
+			public void process(Tuple o, int srcID, long timestamp) {
+				logLine(dsnLogWriter, "" + timestamp / 1000 + " -- "
+						+ o.toString());
+			}
+		};
+		nodeStateChangeFilter.subscribe(logger, 0);
+		eventStream.subscribe(logger, 0);
+
+		// metricStream.subscribe(logger, 0);
+		// routeAnalyzer.subscribe(logger, 0);
+		// packetTupleMapper.subscribe(logger, 0);		
+
+		// map "from", "to" -> "linkID=from#to
+		Tuple.registerTupleType("LinkTuple", "linkID");
+		AbstractPipe<Tuple, Tuple> linkEnumeratorNeighbours = new AbstractPipe<Tuple, Tuple>() {
+			final TupleAttribute idField = new TupleAttribute("linkID");
+
+			final TupleAttribute fromAttribute = new TupleAttribute(
+					"reportingNode");
+
+			final TupleAttribute toAttribute = new TupleAttribute("seenNode");
+
+			public void process(Tuple o, int srcID, long timestamp) {
+				int from = o.getIntAttribute(fromAttribute);
+				int to = o.getIntAttribute(toAttribute);
+				Tuple tuple = Tuple.createTuple("LinkTuple");
+				tuple.setAttribute(idField, "" + from + "#" + to);
+				transfer(tuple, timestamp);
+			}
+		};
+		linkAdvertisementMapper.subscribe(linkEnumeratorNeighbours, 0);
+		// metric: nr of times a neighbour was was reported last ..
+		TupleTimeWindowGroupAggregator linkNeighboursLastEpoch = new TupleTimeWindowGroupAggregator(
+				W * linkAdvPeriod, "linkID", new Counter("LinkListed",
+						"reports"), "linkNeighboursLastEpoch");
+		linkEnumeratorNeighbours.subscribe(linkNeighboursLastEpoch, 0);
+
+		AbstractPipe<Tuple, Tuple> linkEnumeratorData = new AbstractPipe<Tuple, Tuple>() {
+			final TupleAttribute idField = new TupleAttribute("linkID");
+
+			final TupleAttribute l2srcAttribute = new TupleAttribute("l2src");
+
+			final TupleAttribute l2dstAttribute = new TupleAttribute("l2dst");
+
+			public void process(Tuple o, int srcID, long timestamp) {
+				int from = o.getIntAttribute(l2srcAttribute);
+				int to = o.getIntAttribute(l2dstAttribute);
+				Tuple tuple = Tuple.createTuple("LinkTuple");
+				tuple.setAttribute(idField, "" + from + "#" + to);
+				transfer(tuple, timestamp);
+			}
+		};
+		packetTracer.subscribe(linkEnumeratorData, 0);
+		// metric: nr of times a packet was sent across a link ..
+		TupleTimeWindowGroupAggregator linkDataLastEpoch = new TupleTimeWindowGroupAggregator(
+				W * dataPeriod, "linkID", new Counter("LinkData", "reports"),
+				"linkDataLastEpoch");
+		linkEnumeratorData.subscribe(linkDataLastEpoch, 0);
+
+		// connect to GUI
+		createGuiSink(dupFilter, linkAdvertisementMapper, metricStream,
+				eventStream, nodeStateChangeFilter, linkNeighboursLastEpoch,
+				linkDataLastEpoch, seqNrMapper, multiHopFilter,
+				pathAdvertisementMapper, linkBeaconFilter);
+
+		return crcFilter;
 	}
 
 	/**
@@ -776,6 +865,12 @@ public class EWSN extends SNIFController {
 		pathAdvertisementMapper.subscribe(guiSink, 9);
 		multiHopFilter.subscribe(guiSink, 10);
 		linkBeaconFilter.subscribe(guiSink, 11);
+		
+		Scheduler.registerClockView( new TimeTriggered() {
+			public void handleTimerEvent(long timestamp) {
+				view.setTime( ""+(timestamp / 1000)+ " s");
+			}
+		});
 	}
 
 	/**
