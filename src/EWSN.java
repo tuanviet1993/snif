@@ -126,7 +126,7 @@ public class EWSN extends SNIFController {
 		view = new View(this);
 		view.establish();
 		view.setVisible(true);
-		
+		view.setW( W );
 		// fix node positions
 		setNodePositions();
 		
@@ -152,6 +152,8 @@ public class EWSN extends SNIFController {
 				debugger.start.wait();
 			}
 			
+			// get W
+			debugger.W = view.getW();
 			// -- create whole graph and connect to GUI
 			Filter<PacketTuple> crcFilter = debugger.createAnalysisGraph();
 
