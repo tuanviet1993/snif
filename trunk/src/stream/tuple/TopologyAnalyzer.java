@@ -210,7 +210,7 @@ public class TopologyAnalyzer extends AbstractPipe<Tuple,Tuple> implements
 		// check its uplinks
 		int counter = 0;
 		for (TimeStampedObject<Tuple> routeSegment : window ) {
-			NodeAddress l2src = new NodeAddress ( routeSegment.object.getIntAttribute(l2dstAttribute));
+			NodeAddress l2src = new NodeAddress ( routeSegment.object.getIntAttribute(l2srcAttribute));
 			if ( ! l2src.equals( node )) continue;
 			NodeAddress l2dst = new NodeAddress ( routeSegment.object.getIntAttribute(l2dstAttribute));
 
