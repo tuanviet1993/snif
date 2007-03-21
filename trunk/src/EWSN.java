@@ -62,8 +62,10 @@ public class EWSN extends SNIFController {
 	
 	private static final String PACKETDEFINITION = "packetdefinitions/ewsn07.h";
 
-	public static boolean usePacketTracer = false;
+	public static final boolean usePacketTracer = false;
 
+	public static final boolean useCoveredTest = false;
+	
 	private static boolean runDebugger = true; // useLog;
 
 	public static final int WORD_MAX_VALUE = 65535;
@@ -417,14 +419,6 @@ public class EWSN extends SNIFController {
 		BinaryDecisionTree noPacketReceivedTest = new BinaryDecisionTree(
 				new TreeAttributePredicate("PacketsLastEpoch", "packets",
 						TreeAttributePredicate.Comparator.equal, 0));
-		BinaryDecisionTree noPacketReceivedTest2 = new BinaryDecisionTree(
-				new TreeAttributePredicate("PacketsLastEpoch", "packets",
-						TreeAttributePredicate.Comparator.equal, 0));
-		BinaryDecisionTree coveredTest = new BinaryDecisionTree(
-				new TreeAttributePredicate("ObservationQuality", "ratio",
-						TreeAttributePredicate.Comparator2.greater, 0.7f));
-		// BinaryDecisionTree noWitnessTest = new BinaryDecisionTree( new TreeAttributePredicate(
-		//		"NeighbourReportsLastEpoch", "sightings", TreeAttributePredicate.Comparator.equal, 0));
 		BinaryDecisionTree noNeighboursTest = new BinaryDecisionTree(
 				new TreeAttributePredicate("NeighbourSeenLastEpoch",
 						"sightings", TreeAttributePredicate.Comparator.equal, 0));
@@ -514,9 +508,29 @@ public class EWSN extends SNIFController {
 				return attributes;
 			}
 		};
+		BinaryDecisionTree firstTest = null;
+		if (useCoveredTest) {
 
-		coveredTest.setTrue(noPacketReceivedTest);
-		coveredTest.setFalse(noPacketReceivedTest2);
+			BinaryDecisionTree coveredTest = new BinaryDecisionTree(
+					new TreeAttributePredicate("ObservationQuality", "ratio",
+							TreeAttributePredicate.Comparator2.greater, 0.7f));
+
+			BinaryDecisionTree noPacketReceivedTest2 = new BinaryDecisionTree(
+					new TreeAttributePredicate("PacketsLastEpoch", "packets",
+							TreeAttributePredicate.Comparator.equal, 0));
+			
+			coveredTest.setTrue(noPacketReceivedTest);
+			coveredTest.setFalse(noPacketReceivedTest2);
+
+			// Not Covert - if good route OK, otherwise complain
+			noPacketReceivedTest2.setTrue(nodeCrash);
+			noPacketReceivedTest2.setFalse(notCovert);
+			noPacketReceivedTest2.setDefault(notCovert);
+			
+			firstTest = coveredTest;
+		} else {
+			firstTest = noPacketReceivedTest;
+		}
 
 		noPacketReceivedTest.setTrue(nodeCrash);
 		noPacketReceivedTest.setFalse(noRebootsTest);
@@ -564,18 +578,11 @@ public class EWSN extends SNIFController {
 		routingLoopTest.setFalse(BinaryDecisionTree
 				.createTupleResultNode("RoutingFailureGeneral"));
 
-		// Not Covert - if good route OK, otherwise complain
-		// noGoodRouteTest2.setTrue( BinaryDecisionTree.createTupleResultNode ("NodeOK"));
-		// noGoodRouteTest2.setFalse(notCovert);
-		// noGoodRouteTest2.setDefault(notCovert);
-		noPacketReceivedTest2.setTrue(nodeCrash);
-		noPacketReceivedTest2.setFalse(notCovert);
-		noPacketReceivedTest2.setDefault(notCovert);
 
 		// end of tree
 
 		GroupingEvaluator stateDetector = GroupingEvaluator
-				.createBinaryTreeEvaluator(coveredTest, "nodeID",
+				.createBinaryTreeEvaluator(firstTest, "nodeID",
 						"stateDetector");
 		metricStream.subscribe(stateDetector, 0);
 
