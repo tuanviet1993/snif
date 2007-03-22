@@ -240,9 +240,10 @@ public class EWSN extends SNIFController {
 		crcFilter.subscribe(dupFilter, 0);
 
 		// extrac layer2 source
-		Mapper packetIdStream = new Mapper("IDTuple", "bmac_msg_st.source",
-				"nodeID");
+		Mapper packetIdStream = new Mapper("IDTuple", "bmac_msg_st.source", "nodeID");
 		dupFilter.subscribe(packetIdStream, 0);
+		Mapper groupIdStream = new Mapper("groupID", "bmac_msg_st.source", "groupID");
+		dupFilter.subscribe(groupIdStream, 0);
 
 		// get linkBeacon tuple stream
 		Filter<Tuple> linkBeaconFilter = new Filter<Tuple>(
@@ -335,12 +336,14 @@ public class EWSN extends SNIFController {
 				W * pathAdvPeriod, "nodeID", new Counter("RoutesLastEpoch",
 						"routeAnnouncements"), "pathAnnouncementsLastEpoch");
 		pathAdvertisementMapper.subscribe(pathAnnouncementsLastEpoch2, 0);
-
+		groupIdStream.subscribe(pathAnnouncementsLastEpoch2, 0);
+		
 		// metric: number of neighbours reported node ..
 		TupleTimeWindowDistinctGroupAggregator seenByNeighbours = new TupleTimeWindowDistinctGroupAggregator(
 				W * linkAdvPeriod, new Counter("NeighbourReportsLastEpochTemp",
 						"sightings"), "seenNode", "reportingNode", "seenNode");
 		linkAdvertisementMapper.subscribe(seenByNeighbours, 0);
+		groupIdStream.subscribe(seenByNeighbours, 0);
 
 		// use "seenNode" as "nodeID"
 		Mapper seenByNeighboursIDMapper = new Mapper(
@@ -354,6 +357,7 @@ public class EWSN extends SNIFController {
 						"sightings"), "reportingNode", "reportingNode",
 				"seenNode");
 		linkAdvertisementMapper.subscribe(neighboursSeen, 0);
+		groupIdStream.subscribe(neighboursSeen, 0);
 
 		// use "reportingNode" as "nodeID"
 		Mapper neighboursSeenLastEpochIDMapper = new Mapper(
@@ -375,6 +379,7 @@ public class EWSN extends SNIFController {
 				W * dataPeriod, "nodeID", new Counter("GoodRoute", "reports"),
 				"goodRouteReports");
 		goodRouteFilter.subscribe(goodRouteReports, 0);
+		groupIdStream.subscribe(goodRouteReports, 0);
 
 		// get RoutingLoop detections
 		Filter<Tuple> routingLoopFilter = new Filter<Tuple>(
@@ -386,18 +391,21 @@ public class EWSN extends SNIFController {
 				W * dataPeriod, "nodeID",
 				new Counter("RoutingLoops", "reports"), "routingLoopReports");
 		routingLoopFilter.subscribe(routingLoopReports, 0);
+		groupIdStream.subscribe(routingLoopReports, 0);
 
-		// get observation quality ..
+		// get observation quality .. -- requires smoothing
 		TupleTimeWindowDistinctGroupAggregator observationQuality = new TupleTimeWindowDistinctGroupAggregator(
-				W * beaconPeriod, new Ratio("ObservationQuality", "seqNr"),
+				4 * W * beaconPeriod, new Ratio("ObservationQuality", "seqNr"),
 				"nodeID", "nodeID", "seqNr");
 		seqNrMapper.subscribe(observationQuality, 0);
+		groupIdStream.subscribe(observationQuality, 0);
 
 		// reboots last epoch
 		TupleTimeWindowGroupAggregator rebootCount = new TupleTimeWindowGroupAggregator(
 				W * beaconPeriod, "nodeID", new Counter("RebootsLastEpoch",
 						"reboots"), "rebootsLastEpoch");
 		seqResetDetector.subscribe(rebootCount, 0);
+		groupIdStream.subscribe(rebootCount, 0);
 
 		// get all metric streams
 		Union<Tuple> metricStream = new Union<Tuple>();
