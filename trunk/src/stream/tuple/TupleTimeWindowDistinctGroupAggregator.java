@@ -11,13 +11,17 @@ import stream.TimeWindowDistinctGroupAggregator;
 public class TupleTimeWindowDistinctGroupAggregator extends
 TimeWindowDistinctGroupAggregator<Tuple, Object, Object, Tuple> {
 
+	private static final String GROUPID_TUPLE_NAME = "groupID";
+	private static final String GROUPID_FIELD_NAME = "groupID";
+
 	protected AggregationFunction<Tuple> aggregator;
-	protected TupleAttribute groupFieldID;
+	protected TupleAttribute groupField;
 	protected TupleAttribute[] distinctFields;
+	protected TupleAttribute groupTupleGroupField;
 	
 	Function<Tuple,Object> fieldGrouper = new Function<Tuple,Object>() {
 		public Object invoke(Tuple argument) {
-			return argument.getAttribute(groupFieldID);
+			return argument.getAttribute(groupField);
 		}
 	};
 	Function<Tuple,Object> fieldsDistincter = new Function<Tuple,Object>(){
@@ -54,8 +58,9 @@ TimeWindowDistinctGroupAggregator<Tuple, Object, Object, Tuple> {
 		this.timewindow = timewindow;
 		this.grouper = fieldGrouper;
 		this.aggregator = aggregator;
-		this.groupFieldID = new TupleAttribute( groupField);
-		
+		this.groupField = new TupleAttribute( groupField);
+		this.groupTupleGroupField = new TupleAttribute( GROUPID_FIELD_NAME);
+
 		registerType();
 	}
 	
@@ -72,8 +77,9 @@ TimeWindowDistinctGroupAggregator<Tuple, Object, Object, Tuple> {
 		this.distincter = distincter;
 		this.grouper    = grouper;
 		this.aggregator = aggregator;
-		this.groupFieldID = new TupleAttribute( groupField);
-		
+		this.groupField = new TupleAttribute( groupField);
+		this.groupTupleGroupField = new TupleAttribute( GROUPID_FIELD_NAME);
+
 		registerType();
 	}
 
@@ -94,7 +100,7 @@ TimeWindowDistinctGroupAggregator<Tuple, Object, Object, Tuple> {
 				aggregate = aggregator.invoke( aggregate, obj.object);
 			}
 		}
-		aggregate.setAttribute( groupFieldID, gID);
+		aggregate.setAttribute( groupField, gID);
 		// System.out.println(aggregate);
 		transfer( aggregate, timestamp);
 	}
@@ -103,8 +109,12 @@ TimeWindowDistinctGroupAggregator<Tuple, Object, Object, Tuple> {
 		String[] aggregateFields = aggregator.getFields();
 		String tupleType = aggregator.getTupleType();
 		String [] allAttributes = new String[aggregateFields.length+1];
-		allAttributes[0] = groupFieldID.getName();
+		allAttributes[0] = groupField.getName();
 		System.arraycopy(aggregateFields, 0, allAttributes, 1, aggregateFields.length);
 		Tuple.registerTupleType(tupleType, allAttributes);
+
+		// register "group" tuple with "group" field
+		String[] groupTupleField = {GROUPID_FIELD_NAME};
+		Tuple.registerTupleType(GROUPID_TUPLE_NAME, groupTupleField);
 	}
 }
