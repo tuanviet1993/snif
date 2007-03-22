@@ -87,12 +87,12 @@ public class EWSN extends SNIFController {
     };
 
 	// W 
-	int W = 10;
+	static int W = 10;
 	// respective periods
-	final int beaconPeriod = 10 * 1000;
-	final int linkAdvPeriod = 80 * 1000;
-	final int pathAdvPeriod = 80 * 1000;
-	final int dataPeriod = 30 * 1000;
+	final static int beaconPeriod = 10 * 1000;
+	final static int linkAdvPeriod = 80 * 1000;
+	final static int pathAdvPeriod = 80 * 1000;
+	final static int dataPeriod = 30 * 1000;
 
 	private void setNodePositions() {
 		HashMap<Integer, Coordinates> nodePositions = new HashMap<Integer, Coordinates>();
@@ -155,7 +155,7 @@ public class EWSN extends SNIFController {
 			}
 			
 			// get W
-			debugger.W = view.getW();
+			W = view.getW();
 			// -- create whole graph and connect to GUI
 			Filter<PacketTuple> crcFilter = debugger.createAnalysisGraph();
 
@@ -734,23 +734,22 @@ public class EWSN extends SNIFController {
 					Metrics metric = this;
 					String metricInfo = "" + addr + "\n" +
 					NumberFormat.getPercentInstance().format( metric.observationQuatlity) + "\n"+
-					metric.packetsSend + " [100s]\n" +
+					metric.packetsSend + " ["+ beaconPeriod*W/1000+"]\n" +
 
 					metric.lastSeqNr + "\n" +
 					metric.lastBeacon + " s\n" +
 
-					metric.nrNeighbours + " [200s]\n" +
+					metric.nrNeighbours + " ["+ linkAdvPeriod*W/1000+"s]\n" +
 					metric.lastLinkAdv + " s\n" +
 
-					metric.nrPathAnnouncement + " [200s]\n" +
+					metric.nrPathAnnouncement + " ["+ pathAdvPeriod*W/1000+"s]\n" +
 					metric.lastPathQuality + "\n" +
 					metric.lastPathRound + "\n" +
 					metric.lastPathAdv + " s\n" +
-					
 					metric.lastData + " s\n" +
 					
 					metric.nrReboots + "\n" +
-					metric.nrRoutingLoops + " [100s]\n" +
+					metric.nrRoutingLoops + " ["+ dataPeriod*W/1000+"s]\n" +
 
 					metric.battery/1000 + "." +((metric.battery / 10) % 100) + " V\n" +
 					metric.nodeState;
