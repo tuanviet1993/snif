@@ -31,7 +31,7 @@ public class TimeWindowGroupAggregator<I, K, O> extends AbstractPipe<I, O> imple
 	 * @param gID
 	 * @param timestamp
 	 */
-	public void registerGroup(K gID, long timestamp ) {
+	protected void registerGroup(K gID, long timestamp ) {
 		if (!registeredGroups.containsKey(gID)) {
 			registeredGroups.put(gID, null);
 			initList.addLast(new TimeStampedObject<K>(timestamp, gID));
