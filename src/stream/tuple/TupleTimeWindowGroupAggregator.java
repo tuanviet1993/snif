@@ -1,9 +1,18 @@
 package stream.tuple;
 
 import stream.Function;
-import stream.Scheduler;
 import stream.TimeStampedObject;
 import stream.TimeWindowGroupAggregator;
+
+/**
+ * Time window operator. GROUP + AGGREGATE
+ * 
+ * A groupID tuple with the single attribute "groupID" can be used to assert that an empty
+ * aggregate is emitted after time window time
+ * 
+ * @author mringwal
+ *
+ */
 
 public class TupleTimeWindowGroupAggregator extends TimeWindowGroupAggregator<Tuple,Object,Tuple> {
 
@@ -53,6 +62,7 @@ public class TupleTimeWindowGroupAggregator extends TimeWindowGroupAggregator<Tu
 			super.process( o, srcID, timestamp );
 		}
 	}
+	
 	/**
 	 * @param o
 	 * @param timestamp

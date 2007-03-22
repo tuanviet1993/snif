@@ -7,6 +7,16 @@ import stream.Function;
 import stream.TimeStampedObject;
 import stream.TimeWindowDistinctGroupAggregator;
 
+/**
+ * Time window operator. DISTINC + GROUP + AGGREGATE
+ * 
+ * A set of tuple attributes are specified: no two tuples with the same values are stored
+ * A groupID tuple with the single attribute "groupID" can be used to assert that an empty
+ * aggregate is emitted after time window time
+ * 
+ * @author mringwal
+ *
+ */
 
 public class TupleTimeWindowDistinctGroupAggregator extends
 TimeWindowDistinctGroupAggregator<Tuple, Object, Object, Tuple> {
@@ -81,6 +91,18 @@ TimeWindowDistinctGroupAggregator<Tuple, Object, Object, Tuple> {
 		this.groupTupleGroupField = new TupleAttribute( GROUPID_FIELD_NAME);
 
 		registerType();
+	}
+
+	/**
+	 *  Handle GROUPID_TUPLE_NAME tuples that contain a group id
+	 */
+	public void process(Tuple o, int srcID, long timestamp) {
+		// check for "group" tuple
+		if (o.getType() == GROUPID_TUPLE_NAME) {
+			registerGroup(o.getAttribute(groupTupleGroupField), timestamp);
+		} else {
+			super.process( o, srcID, timestamp );
+		}
 	}
 
 	/**
