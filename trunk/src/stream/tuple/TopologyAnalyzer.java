@@ -15,18 +15,29 @@ import stream.TimeTriggered;
  * @author mringwal
  *
  * @todo: only send if node partition state changes
- * 
+ * @todo: limit validation by post-poning validation. but have to use timer for this
  */
 public class TopologyAnalyzer extends AbstractPipe<Tuple,Tuple> implements
 		TimeTriggered {
 
+	/** single downlink and its timeout */
+	private class DownLink {
+		NodeAddress downLink;
+		long timeout;
+		DownLink( NodeAddress addr, long timeout) {
+			downLink = addr;
+			this.timeout = timeout;
+		}
+	}
+	
+	/** node state used for evaluation of network */
 	private class NodeState {
 		NodeAddress nodeId;
 		String partitionCause = "";
-		ConnectionType upstreamConnection;
 		long evaluationTime = 0;
 		boolean inEvaluation = false;
 		Tuple stateTuple = null; 
+		HashMap<NodeAddress, DownLink> downLinks = new HashMap<NodeAddress, DownLink>();
 		
 		/**
 		 * @param nodeId
@@ -38,10 +49,7 @@ public class TopologyAnalyzer extends AbstractPipe<Tuple,Tuple> implements
 		}
 	}
 	
-	private enum ConnectionType {
-		crashed, routeToSink, cannotEvaluate, partitioned
-	}
-	protected NodeAddress sink = new NodeAddress( 2 );
+	protected NodeAddress sink;
 	
 	protected HashMap<NodeAddress,NodeState> nodeStates = new HashMap<NodeAddress,NodeState>();
 	
@@ -49,13 +57,15 @@ public class TopologyAnalyzer extends AbstractPipe<Tuple,Tuple> implements
 	
 	protected int metricPeriod;
 	
-	protected int nodeStateChangeSrcID;
-	
-	protected int packetTracerSrcID;
-	
+	public long lastEvaluation = 0;
+
 	protected LinkedList<TimeStampedObject<Tuple>> window = new LinkedList<TimeStampedObject<Tuple>>();
 
 	TupleChangePredicate tupleChangePredicate;
+
+	protected int nodeStateChangeSrcID;
+	
+	protected int packetTracerSrcID;
 
 	int partionedTupleID;
 
@@ -69,9 +79,6 @@ public class TopologyAnalyzer extends AbstractPipe<Tuple,Tuple> implements
 	
 	TupleAttribute l2dstAttribute;
 
-	public long timeUsedNano = 0;
-
-	public long lastEvaluation = 0;
 	
 	/**
 	 * @param sink
@@ -95,6 +102,8 @@ public class TopologyAnalyzer extends AbstractPipe<Tuple,Tuple> implements
 		l2srcAttribute = new TupleAttribute("l2src");
 		l2dstAttribute = new TupleAttribute("l2dst");		
 		
+		// prepare sink node state
+		nodeStates.put( sink, new NodeState( sink ));
 	}
 
 
@@ -103,195 +112,128 @@ public class TopologyAnalyzer extends AbstractPipe<Tuple,Tuple> implements
 	 *
 	 */
 	protected void validateNew(long timestamp) {
-		if (timestamp > lastEvaluation + metricPeriod){
-			// System.out.println("Network Parition, Validate at " + timestamp/1000);
+		System.out.println("Network Parition, Validate at " + timestamp / 1000);
 
-			// clear evaluation markers
-			for (NodeAddress node : nodeStates.keySet()){
-				NodeState nodeState = nodeStates.get( node );
-				nodeState.inEvaluation = true;
-				nodeState.partitionCause = "";
-			}
-			// TODO implement faster algorithm, see paper
+		// clear evaluation markers
+		for (NodeAddress node : nodeStates.keySet()) {
+			NodeState nodeState = nodeStates.get(node);
+			nodeState.inEvaluation = true;
+			nodeState.partitionCause = "";
 		}
-	}
+		// tree traversal to mark connected nodes.
+		// also get list of crashed nodes
+		HashMap<NodeAddress, NodeState> crashedNodes = new HashMap<NodeAddress, NodeState>();
+		markConnectedAndCrashed(timestamp, sink, crashedNodes);
 
-	/** 
-	 * evaluate all nodes
-	 *
+		// figure out last valid uplink and report as partitioned
+		reportPartitionedNodes(timestamp, crashedNodes);
+	}
+	
+	/**
+	 * Mark all reachable nodes as connected
+	 * 
+	 * @param connectedNode is reachable by valid links from sink
+	 * @param crashedNodes to collect crashed nodes
 	 */
-	private boolean changed;
-	protected void validate(long timestamp) {
-		if (timestamp > lastEvaluation + metricPeriod){
-			// System.out.println("Network Parition, Validate at " + timestamp/1000);
-
-			// clear evaluation markers
-			for (NodeAddress node : nodeStates.keySet()){
-				NodeState nodeState = nodeStates.get( node );
-				nodeState.inEvaluation = true;
-				nodeState.partitionCause = "";
-				nodeState.upstreamConnection = null;
-			}
-			
-			// mark all crashed nodes and nodes which could reach the sink
-			do {
-				changed = false;
-				for (NodeAddress node : nodeStates.keySet()){
-					markCrashedAndConnected( node, timestamp);
-				}
-			} while (changed);
-
-			// identify remaining nodes: node which have at least one paritioned or crashed node as uplink are partitiones
-			do {
-				changed = false;
-				for (NodeAddress node : nodeStates.keySet()){
-					reportParitionedNodes( node, timestamp, false);
-				}
-			} while (changed);
-			
-			// also report nodes which are still in evaluation
-			for (NodeAddress node : nodeStates.keySet()){
-				reportParitionedNodes( node, timestamp, true);
-			}
-			
-			//System.out.println("time network partition "+timeUsedNano);
-			lastEvaluation = timestamp;
-		}
-	}
-	
-	
-	private void markCrashedAndConnected(NodeAddress node, long timestamp ) {
-		NodeState nodeState = nodeStates.get( node );
+	private void markConnectedAndCrashed(long timestamp, NodeAddress connectedNode, HashMap<NodeAddress,NodeState> crashedNodes) {
+		NodeState nodeState = nodeStates.get( connectedNode );
 		// of interest?
 		if (!nodeState.inEvaluation) return;
- 		if (nodeState.upstreamConnection == ConnectionType.routeToSink) return;
 		
 		// check this node for NodeCrash
 		Tuple nodeStateTuple = nodeState.stateTuple;
-		if (nodeStateTuple == null) {
-			// don't know nothing
-			nodeState.evaluationTime = timestamp;
-			nodeState.upstreamConnection = ConnectionType.cannotEvaluate;
-			nodeState.inEvaluation = false;
-			changed = true;
-			return;
-		}
-		if (nodeStateTuple.getType() == "NodeCrash") {
+		if (nodeStateTuple != null && nodeStateTuple.getType() == "NodeCrash") {
+			// remember crashed node
+			crashedNodes.put(connectedNode, nodeState);
+			
 			// System.out.println("Network Parition: node "+node + " crashed at " + timestamp/1000);
 			nodeState.evaluationTime = timestamp;
-			nodeState.upstreamConnection = ConnectionType.crashed;
 			nodeState.inEvaluation = false;
-			changed = true;
+			nodeState.partitionCause = connectedNode.toString();
 			return;
 		}
-		// check its uplinks
-		for (TimeStampedObject<Tuple> routeSegment : window ) {
-			NodeAddress l2src = new NodeAddress ( routeSegment.object.getIntAttribute(l2srcAttribute));
-			if ( ! l2src.equals( node )) continue;
-			NodeAddress l2dst = new NodeAddress ( routeSegment.object.getIntAttribute(l2dstAttribute));
-			// upstream node is sink
-			if ( l2dst.equals(sink)) {
-				nodeState.evaluationTime = timestamp;
-				nodeState.inEvaluation = false;
-				if (nodeState.upstreamConnection == null || nodeState.upstreamConnection != ConnectionType.routeToSink ) {
-					nodeState.upstreamConnection = ConnectionType.routeToSink; 
-					Tuple result = Tuple.createTuple(partionedTupleID);
-					result.setIntAttribute( nodeIDID, node.getInt());
-					result.setIntAttribute( partitionedID, 0);
-					result.setStringAttribute( crashedNodesIDs, ""+sink);
-					// System.out.println("Network OK at " + timestamp/1000 + " " + result);
-					transfer( result, timestamp );
-				}
-				changed = true;
-				return;
-			}
-			// check if upstream node is evaluated and has route
-			NodeState nodeUpState = nodeStates.get( l2dst );
-			if (nodeUpState == null) continue;
-			if (nodeUpState.inEvaluation) continue;
-			if (nodeUpState.upstreamConnection == ConnectionType.routeToSink) {
-				nodeState.evaluationTime = timestamp;
-				nodeState.inEvaluation = false;
-				if (nodeState.upstreamConnection == null || nodeState.upstreamConnection != ConnectionType.routeToSink ) {
-					nodeState.upstreamConnection = ConnectionType.routeToSink; 
-					Tuple result = Tuple.createTuple(partionedTupleID);
-					result.setIntAttribute( nodeIDID, node.getInt());
-					result.setIntAttribute( partitionedID, 0);
-					result.setStringAttribute( crashedNodesIDs, ""+l2dst);
-					// System.out.println("Network OK at " + timestamp/1000 + " " + result);
-					transfer( result, timestamp );
-				}
-				changed = true;
-				return;
-			}
-		}
-	}
 
-
-	
-	private void reportParitionedNodes(NodeAddress node, long timestamp, boolean markNonEvaluated ) {
-		NodeState nodeState = nodeStates.get( node );
-		// of interest?
-		if (!nodeState.inEvaluation) return;
-		
-		// check its uplinks
-		int counter = 0;
-		for (TimeStampedObject<Tuple> routeSegment : window ) {
-			NodeAddress l2src = new NodeAddress ( routeSegment.object.getIntAttribute(l2srcAttribute));
-			if ( ! l2src.equals( node )) continue;
-			NodeAddress l2dst = new NodeAddress ( routeSegment.object.getIntAttribute(l2dstAttribute));
-
-			// at least one link did exists => partitioned. collect causes
-			counter++;
-
-			// check if upstream node is evaluated and has route
-			NodeState nodeUpState = nodeStates.get( l2dst );
-
-			// are all uplinks evaluated ?
-			if (!markNonEvaluated && nodeUpState == null) return;
-			if (!markNonEvaluated && nodeUpState.inEvaluation) return;
-			
-			// upstream node has crashed
-			if (nodeUpState.upstreamConnection == ConnectionType.crashed) {
-				if ( nodeState.partitionCause.indexOf( l2dst.toString()) < 0) {
-					nodeState.partitionCause += l2dst + " ";
-				}
-			}
-			// upstream node is partitioned
-			// @TODO properly add multiple partition causes
-			if (nodeUpState.upstreamConnection ==  ConnectionType.partitioned) {
-				String cause = nodeStates.get( l2dst ).partitionCause;
-				if ( nodeState.partitionCause.indexOf( cause ) < 0) {
-					nodeState.partitionCause += cause + " ";
-				}
-			}
-		}
-		if (counter > 0) {
-			nodeState.evaluationTime = timestamp;
-			if (nodeState.upstreamConnection == null || nodeState.upstreamConnection != ConnectionType.partitioned ) {
-				nodeState.upstreamConnection = ConnectionType.partitioned;
-				Tuple result = Tuple.createTuple(partionedTupleID);
-				result.setIntAttribute( nodeIDID, node.getInt());
-				result.setIntAttribute( partitionedID, 1);
-				result.setStringAttribute( crashedNodesIDs, nodeState.partitionCause);
-				// System.out.println("Network Paritioned at " + timestamp/1000 + " " + result);
-				transfer( result, timestamp );
-			}
-			changed = true;
-		}
+		// node is connected. mark it and descent further
+		nodeState.evaluationTime = timestamp;
 		nodeState.inEvaluation = false;
+		Tuple result = Tuple.createTuple(partionedTupleID);
+		result.setIntAttribute( nodeIDID, connectedNode.getInt());
+		result.setIntAttribute( partitionedID, 0);
+		result.setStringAttribute( crashedNodesIDs, ""+sink);
+		
+		transfer( result, timestamp );
+		
+		//  check downlinks
+		for (DownLink dl : nodeState.downLinks.values()) {
+			if (dl.timeout > timestamp) {
+				markConnectedAndCrashed( timestamp, dl.downLink, crashedNodes);
+			}
+		}
+		
 	}
+	
+	/**
+	 * report not connected nodes as partitioned 
+	 * 
+	 * this is done on a level-by-level basis
+	 * 
+	 * @param timestamp
+	 * @param crashedNodes
+	 */
+	private void reportPartitionedNodes(long timestamp, HashMap<NodeAddress,NodeState> crashedNodes) {
+		// mark all nodes that can be reached from crashed nodes as partitioned
+		HashMap<NodeAddress,NodeState> partitionedNodes = new HashMap<NodeAddress,NodeState> ();
+		boolean partitioned;
+		do {
+			partitioned = false;
+			for (NodeState crashedNode : crashedNodes.values()  ) {
+				for (DownLink dl : crashedNode.downLinks.values()) {
+					NodeState downLinkNode = nodeStates.get( dl.downLink);
+					if (downLinkNode.inEvaluation) {
+						partitioned = true;
+						downLinkNode.partitionCause += crashedNode.partitionCause + " ";
+						partitionedNodes.put( dl.downLink, downLinkNode);
+					}
+				}
+			}
+			// report nodes
+			for (NodeState partitionedNode : partitionedNodes.values() ){
+				// mark as evaluated
+				partitionedNode.inEvaluation = false;
+				// emit paritioned tuple
+				Tuple result = Tuple.createTuple(partionedTupleID);
+				result.setIntAttribute( nodeIDID, partitionedNode.nodeId.getInt());
+				result.setIntAttribute( partitionedID, 1);
+				result.setStringAttribute( crashedNodesIDs, partitionedNode.partitionCause);
+				// System.out.println("Network Paritioned at " + timestamp/1000 + " " + result);
+				transfer( result, timestamp );				
+			}
+			// prepare next round
+			crashedNodes= partitionedNodes;
+			partitionedNodes = new HashMap<NodeAddress,NodeState> ();
+			
+		} while (partitioned == true);
+	}
+
 
 	public void handleTimerEvent(long timestamp) {
 		// check entries for removal
-		boolean removed = false;
+		boolean validate = false;
 		while (window.size() > 0 && window.getFirst().timestamp + timewindow <= timestamp ) {
-			window.removeFirst();
-			removed = true;
+			Tuple o = window.removeFirst().object;
+			// did link vanish?
+			NodeState parent = nodeStates.get( new NodeAddress( o.getIntAttribute(l2dstAttribute) ));
+			DownLink dl = parent.downLinks.get( new NodeAddress( o.getIntAttribute(l2srcAttribute) ));
+			if (dl == null) {
+				validate = true;
+			} else 	if (dl.timeout <= timestamp) {
+				validate = true;
+				parent.downLinks.remove( dl.downLink);
+			}
 		}
 		// check nodes
-		if (removed)
-			validate( timestamp );
+		if (validate)
+			validateNew( timestamp );
 	}
 
 	public void process(Tuple o, int srcID, long timestamp) {
@@ -312,11 +254,19 @@ public class TopologyAnalyzer extends AbstractPipe<Tuple,Tuple> implements
 				nodeStates.put( l2dst, new NodeState( l2dst ));
 			}
 			
+			// store or update downlink timeout
+			NodeState parentNode = nodeStates.get( l2dst );
+			DownLink dl = parentNode.downLinks.get(l2src);
+			if (dl == null) {
+				parentNode.downLinks.put( l2src, new DownLink(l2src,timestamp+timewindow ));
+				// new link => check nodes
+				validate = true;
+			} else {
+				dl.timeout = timestamp+timewindow;
+			}
+			
 			// register timeout
 			Scheduler.getInstance().registerTimeout( timestamp + timewindow, this );
-
-			// check nodes
-			validate = true;
 		}
 		
 		if (srcID == nodeStateChangeSrcID) {
@@ -333,6 +283,6 @@ public class TopologyAnalyzer extends AbstractPipe<Tuple,Tuple> implements
 			validate = true;
 		}
 		// check nodes
-		if (validate) validate( timestamp );
+		if (validate) validateNew( timestamp );
 	}
 }
