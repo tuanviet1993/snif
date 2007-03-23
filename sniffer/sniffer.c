@@ -335,7 +335,8 @@ static bt_acl_pkt_buf* cl_timestamp(bt_acl_pkt_buf* pkt_buf,
 {
 	struct timestamp * t = (struct timestamp *) data;
 	printf("cl_timestamp with round %u, last round %u\n", t->sync_round, time_sync_round);
-	if ((t->sync_round == 0 && time_sync_round != 0) || t->sync_round > time_sync_round) {
+//	if ((t->sync_round == 0 && time_sync_round != 0) || t->sync_round > time_sync_round) {
+	if ( t->sync_round != time_sync_round) {
         time_sync_round = t->sync_round;
         memcpy( (void*) &parentStamp, data, sizeof (struct timestamp));
         parentConHandle = bt_acl_get_con_handle( pkt_buf->pkt);
@@ -502,6 +503,8 @@ void sendTimeStamp(void){
     bt_hci_con_handle_t con_handle;
 	struct timestamp t;
 
+	printf("sendTimeStamp\n");
+
     // update time info based on own bt clock, clock offset and parent timestamp
     getBtClockSample();
     if (snif_am_sink) {
@@ -512,7 +515,6 @@ void sendTimeStamp(void){
         u_long clock_offset_bit_2to16 = bt_hci_read_clock_offset(bt_stack, BT_HCI_SYNC, parentConHandle) << 2; // same units: 0.3125 ms
         // printf( "clock_offset_bit_2to16 %lu\n", clock_offset_bit_2to16);
         u_char role = (u_char) bt_hci_local_role_discovery( bt_stack, parentConHandle);
-        printf("2.. ");
         long clock_offset_approx = 0;
         if (role == BT_HCI_MY_ROLE_SLAVE) {
             clock_offset_approx = sample_bt_clock - parentStamp.bt_clock;
@@ -536,7 +538,7 @@ void sendTimeStamp(void){
 	t.sync_round = time_sync_round;
     t.root_bt_clock_offset = offsetToRoot;
     bt_hci_get_local_bt_addr( bt_stack, t.bt_addr);
-    //   printf("Timesync: Root BT clock %lu: my BT clock %lu, parent BT clock %lu, Round %u\n", t.bt_clock + offsetToRoot, t.bt_clock, t.bt_clock + offsetToParent, time_sync_round);
+    printf("Timesync: Root BT clock %lu: my BT clock %lu, parent BT clock %lu, Round %u\n", t.bt_clock + offsetToRoot, t.bt_clock, t.bt_clock + offsetToParent, time_sync_round);
     
     // send my clock to all neighbours to re-inforce tree
     num_cons = con_mgr_get_rel_cons( rel_cons);
@@ -591,7 +593,7 @@ void sendTick( void ){
 	* (u_long*) &l2cap_pkt->payload[6] = timestamp;
 	// set data (->len)
 	l2cap_pkt->payload[10] = 0;
-	printf("sendTick, t = %lu \n", timestamp);
+	// printf("sendTick, t = %lu \n", timestamp);
 	bt_l2cap_send( l2cap_channel_id, l2cap_pkt, packet_size);
 	lastPacketSendToHost = NutGetTickCount();
 }
@@ -628,6 +630,31 @@ void setBMACConfig(void) {
 }
 #endif
 
+void prettyPrintConfig(void) {
+    // dump 
+    print_hex_data( "SNIFFER: snif config received (%u): ", (u_char *) &snif_config, sizeof(struct sniffer_config) );
+    printf("> freq %lu\n", snif_config.freq);
+    printf("> sopLength %u\n", snif_config.sopLength);
+    if (snif_config.sopLength > 1) {
+        printf("> sopWord %02x%02x\n", snif_config.sopFirst, snif_config.sopSecond);
+    } else {
+        printf("> sopByte %x\n", snif_config.sopFirst);
+    }
+    if (snif_config.fixedSize) {
+        printf("> packetSize = %u\n", snif_config.headerSize);
+    } else {
+        printf("> headerSize = %u\n", snif_config.headerSize);
+        printf("> lengthPos = %u\n", snif_config.lengthPos);
+        printf("> lengthOffset = %u\n", snif_config.lengthOffset);
+    }
+    if (snif_config.crcLength == 2) {
+        printf("> crc len  = %u\n", snif_config.crcLength);
+        printf("> crc word = %02x\n", snif_config.crcPoly);
+        printf("> crc pos  = %u\n", snif_config.crcPos);
+    } 
+}
+
+
 void packetGenerator(void){
 	struct sniffed_packet * packet;
 	u_long fake_timestamp = 1;
@@ -654,6 +681,10 @@ void packetGenerator(void){
 			printf("SNIFFER: packet queue full, dropping packet\n");
 		}
 	}
+}
+
+THREAD ( BLINK, arg ) {
+    while(1);
 }
 
 THREAD ( SNIFFER, arg){
@@ -725,36 +756,13 @@ THREAD ( SNIFFER, arg){
 #else
 	printf("SNIFFER: started\n");
 	snif_config_queue = 0;
-	// NutEventWait(&snif_config_queue, NUT_WAIT_INFINITE);
+	NutEventWait(&snif_config_queue, NUT_WAIT_INFINITE);
 	printf("SNIFFER: config set, ready\n");
     packetGenerator();
 #endif
     while (1) { NutSleep(1000); };
 }
 
-void prettyPrintConfig(void) {
-    // dump 
-    print_hex_data( "SNIFFER: snif config received (%u): ", (u_char *) &snif_config, sizeof(struct sniffer_config) );
-    printf("> freq %lu\n", snif_config.freq);
-    printf("> sopLength %u\n", snif_config.sopLength);
-    if (snif_config.sopLength > 1) {
-        printf("> sopWord %02x%02x\n", snif_config.sopFirst, snif_config.sopSecond);
-    } else {
-        printf("> sopByte %x\n", snif_config.sopFirst);
-    }
-    if (snif_config.fixedSize) {
-        printf("> packetSize = %u\n", snif_config.headerSize);
-    } else {
-        printf("> headerSize = %u\n", snif_config.headerSize);
-        printf("> lengthPos = %u\n", snif_config.lengthPos);
-        printf("> lengthOffset = %u\n", snif_config.lengthOffset);
-    }
-    if (snif_config.crcLength == 2) {
-        printf("> crc len  = %u\n", snif_config.crcLength);
-        printf("> crc word = %02x\n", snif_config.crcPoly);
-        printf("> crc pos  = %u\n", snif_config.crcPos);
-    } 
-}
 
 /**
  * snif worker thread
@@ -774,6 +782,10 @@ THREAD ( WORKER, arg){
 	snif_set_config = 0;
 	snif_send_timestamp = 0;
 
+    // enable debug uart to slow down bt communication (prevent crash !!!)
+    // not needed since btnut was fixed in 2/2007
+    // _bt_hci_debug_uart = 1;
+    
 	printf("WORKER: started\n");
 	
 	while(1){
@@ -783,7 +795,6 @@ THREAD ( WORKER, arg){
 		
 		// configure MAC sniffer
 		if (snif_set_config){
-            // prettyPrintConfig();
 			sniffer_config(&snif_config);
 			snif_set_config = 0;
 			NutEventPost( &snif_config_queue);
