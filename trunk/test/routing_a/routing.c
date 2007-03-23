@@ -397,8 +397,9 @@ void data_handler(ccc_packet_t *pkt) {
 	}
 }
 
-int main(void) {
-	u_char i, temp;
+void main(void) {
+	u_char i;
+    char temp;
 	u_short seqNr = 0;
     u_short mhopSeqNr = 0;
 	int err;
@@ -414,7 +415,7 @@ int main(void) {
     srand( node_addr );
     
 	// set sink state for node 234 and another one
-	if (node_addr == 0xea || node_addr == 0x8f){
+	if (node_addr == 0xea || node_addr == 0x8f ){
 		I_AM_SINK = 1;
 	}
 	
