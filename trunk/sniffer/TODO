@@ -1,4 +1,8 @@
-ewsn demo / sniffer todo
+TODO
 
-- time sync in btnut auf applikation ebene
-- receive snif config and start sniffer
+TimeSync
+- use better bt clock measurements
+- use nut millis from read bt clock call
+
+LEDs
+- replace CM blink by LEDs for sync pulse + received packet
