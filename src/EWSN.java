@@ -73,7 +73,7 @@ public class EWSN extends SNIFController {
 	private static int totalData;
 
 	// address of sink in observed network
-	final static int theSinkID = 0x8f ; // 0xea;
+	final static int theSinkID = 0xea;
 	final static NodeAddress theSink = new NodeAddress( theSinkID );
 
 	private static View view;
@@ -330,6 +330,7 @@ public class EWSN extends SNIFController {
 				W * beaconPeriod, "nodeID", new Counter("PacketsLastEpoch",
 						"packets"), "packetsLastEpoch");
 		packetIdStream.subscribe(packetCount, 0);
+		groupIdStream.subscribe(packetCount, 0);
 
 		// metric: number of valid route announcements ..e
 		TupleTimeWindowGroupAggregator pathAnnouncementsLastEpoch2 = new TupleTimeWindowGroupAggregator(
