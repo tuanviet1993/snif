@@ -95,7 +95,7 @@ public class Scheduler {
 
 		if (source instanceof RealTime) {
 			RealTime realTimeSrc = (RealTime) source;
-			while (true) {
+			while (!stop) {
 				if (realTimeSrc.ready()) {
 					packet = src2.next();
 
@@ -128,7 +128,7 @@ public class Scheduler {
 			}
 		} else {
 			long simulationTime = 0;
-			while (( packet = (ITimeStampedObject) src2.next()) != null && stop == false) {
+			while (( packet = (ITimeStampedObject) src2.next()) != null && !stop) {
 				packetCounter++;
 				
 				// simulate packet loss..

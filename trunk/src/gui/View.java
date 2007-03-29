@@ -603,44 +603,76 @@ public class View extends JFrame implements ActionListener, ChangeListener {
 		// TODO Auto-generated method stub
 		System.out.println(arg0);
 		if (arg0.getActionCommand().equals("Connect")) {
-			controller.useDSN = true;
-			controller.useLog = false;
+			handleConnect();
+		} else if (arg0.getActionCommand().equals("Open")) {
+			handleOpen();
+		} else if (arg0.getActionCommand().equals("Stop")) {
+			handleStop();
+		}
+	}
+
+	/**
+	 * 
+	 */
+	private void handleOpen() {
+		controller.useDSN = false;
+		controller.useLog = true;
+		FileDialog fd = new FileDialog(this, "Open SNIF Log File...");
+		fd.setDirectory( new File(".").getAbsolutePath());
+		fd.setFilenameFilter(new FilenameFilter() {
+			public boolean accept(File dir, String name) {
+				return name.startsWith("log_");
+			}
+		});
+		fd.setVisible(true);
+		if (fd.getFile() != null) {
 			connect.setEnabled(false);
 			open.setEnabled(false);
-	        speedSlider.setEnabled(false);
 			reset();
-			synchronized(controller.start) {;
-			
+			controller.PACKET_INPUT = fd.getDirectory()+File.separator+fd.getFile();
+			synchronized(controller.start) {
 				controller.start.notify();
 			}
 			stop.setEnabled(true);
-		} else if (arg0.getActionCommand().equals("Open")) {
-			controller.useDSN = false;
-			controller.useLog = true;
-			FileDialog fd = new FileDialog(this, "Open SNIF Log File...");
-			fd.setDirectory( new File(".").getAbsolutePath());
-			fd.setFilenameFilter(new FilenameFilter() {
-				public boolean accept(File dir, String name) {
-					return name.startsWith("log_");
-				}
-			});
-			fd.setVisible(true);
-			if (fd.getFile() != null) {
-				connect.setEnabled(false);
-				open.setEnabled(false);
-				reset();
-				controller.PACKET_INPUT = fd.getDirectory()+File.separator+fd.getFile();
-				synchronized(controller.start) {
-					controller.start.notify();
-				}
-				stop.setEnabled(true);
-		        speedSlider.setEnabled(true);
-			}
-		} else if (arg0.getActionCommand().equals("Stop")) {
-			Scheduler.stop();
-	        speedSlider.setEnabled(false);
+		    speedSlider.setEnabled(true);
 		}
 	}
+
+	/**
+	 * 
+	 */
+	private void handleConnect() {
+		// update Widgets
+		connect.setEnabled(false);
+		open.setEnabled(false);
+		speedSlider.setEnabled(false);
+		reset();
+		// do it
+		controller.useDSN = true;
+		controller.useLog = false;
+		synchronized(controller.start) {;
+			controller.start.notify();
+		}
+		stop.setEnabled(true);
+	}
+
+	/**
+	 * handle Stop button
+	 * 
+	 * if connected, disconnect
+	 * if log processing just stop
+	 * 
+	 */
+	private void handleStop() {
+		if (controller.useDSN) {
+			
+		} else {
+			
+		}
+		Scheduler.stop();
+		speedSlider.setEnabled(false);
+	}
+
 
 	public void simulationStopped() {
 		connect.setEnabled(true);
@@ -653,9 +685,14 @@ public class View extends JFrame implements ActionListener, ChangeListener {
 			writeMessage( "Connected to DSN at "+dsnNode);
 		} else {
 			connect.setEnabled(false);
+			writeMessage( "Connection to DSN lost");
+			
+			connect.setEnabled(true);
+			open.setEnabled(true);
+			stop.setEnabled(false);
 		}
 	}
-	
+
 	public void stateChanged(ChangeEvent e) {
 		JSlider source = (JSlider) e.getSource();
 		if (!source.getValueIsAdjusting()) {

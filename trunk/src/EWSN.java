@@ -73,7 +73,7 @@ public class EWSN extends SNIFController {
 	private static int totalData;
 
 	// address of sink in observed network
-	final static int theSinkID = 0xea;
+	final static int theSinkID = 0xb0; // 0xea;
 	final static NodeAddress theSink = new NodeAddress( theSinkID );
 
 	private static View view;
@@ -178,7 +178,7 @@ public class EWSN extends SNIFController {
 
 				// DNS connection
 				dsnConnection = new DSNConnector();
-
+				dsnConnection.registerView(view);
 				// is used for Graph
 				dsnPacketSource = new DSNPacketSource(dsnConnection, parser );
 				AbstractSink<PacketTuple> packetLogger = createPacketLogger(dsnLogWriter);
@@ -200,11 +200,15 @@ public class EWSN extends SNIFController {
 
 			Scheduler.run( dsnPacketSource );
 
-			
 			// flush and close file
 			if (dsnLogWriter != null) {
 				dsnLogWriter.flush();
 				dsnLogWriter.close();
+			}
+
+			// stop DSN
+			if (debugger.useDSN) {
+				dsnConnection.stopConnection();
 			}
 
 			// update GUI
@@ -425,6 +429,103 @@ public class EWSN extends SNIFController {
 		seqResetDetector.subscribe(eventStream, 0);
 		// TODO latencyObservator.subscribe( eventStream, 0 );
 
+		BinaryDecisionTree firstTest = createDecisionTree();
+
+		GroupingEvaluator stateDetector = GroupingEvaluator
+				.createBinaryTreeEvaluator(firstTest, "nodeID",
+						"stateDetector");
+		metricStream.subscribe(stateDetector, 0);
+
+		// get node state changes
+		Filter<Tuple> nodeStateChangeFilter = new Filter<Tuple>(
+				new TupleChangePredicate("nodeID"));
+		stateDetector.subscribe(nodeStateChangeFilter, 0);
+
+		// network partition detetction
+		int packetTracerID = 1;
+		int nodeStateChangeFilterID = 2;
+		TopologyAnalyzer partitionDetection = new TopologyAnalyzer(
+				theSink, W * pathAdvPeriod, 10 * 1000, nodeStateChangeFilterID,
+				packetTracerID);
+		packetTracer.subscribe(partitionDetection, packetTracerID);
+		nodeStateChangeFilter.subscribe(partitionDetection,
+				nodeStateChangeFilterID);
+		partitionDetection.subscribe(metricStream, 0);
+
+		// log to file
+		AbstractSink<Tuple> logger = new AbstractSink<Tuple>() {
+			public void process(Tuple o, int srcID, long timestamp) {
+				logLine(dsnLogWriter, "" + timestamp / 1000 + " -- "
+						+ o.toString());
+			}
+		};
+		nodeStateChangeFilter.subscribe(logger, 0);
+		eventStream.subscribe(logger, 0);
+
+		// metricStream.subscribe(logger, 0);
+		// routeAnalyzer.subscribe(logger, 0);
+		// packetTupleMapper.subscribe(logger, 0);		
+
+		// map "from", "to" -> "linkID=from#to
+		Tuple.registerTupleType("LinkTuple", "linkID");
+		AbstractPipe<Tuple, Tuple> linkEnumeratorNeighbours = new AbstractPipe<Tuple, Tuple>() {
+			final TupleAttribute idField = new TupleAttribute("linkID");
+
+			final TupleAttribute fromAttribute = new TupleAttribute(
+					"reportingNode");
+
+			final TupleAttribute toAttribute = new TupleAttribute("seenNode");
+
+			public void process(Tuple o, int srcID, long timestamp) {
+				int from = o.getIntAttribute(fromAttribute);
+				int to = o.getIntAttribute(toAttribute);
+				Tuple tuple = Tuple.createTuple("LinkTuple");
+				tuple.setAttribute(idField, "" + from + "#" + to);
+				transfer(tuple, timestamp);
+			}
+		};
+		linkAdvertisementMapper.subscribe(linkEnumeratorNeighbours, 0);
+		// metric: nr of times a neighbour was was reported last ..
+		TupleTimeWindowGroupAggregator linkNeighboursLastEpoch = new TupleTimeWindowGroupAggregator(
+				W * linkAdvPeriod, "linkID", new Counter("LinkListed",
+						"reports"), "linkNeighboursLastEpoch");
+		linkEnumeratorNeighbours.subscribe(linkNeighboursLastEpoch, 0);
+
+		AbstractPipe<Tuple, Tuple> linkEnumeratorData = new AbstractPipe<Tuple, Tuple>() {
+			final TupleAttribute idField = new TupleAttribute("linkID");
+
+			final TupleAttribute l2srcAttribute = new TupleAttribute("l2src");
+
+			final TupleAttribute l2dstAttribute = new TupleAttribute("l2dst");
+
+			public void process(Tuple o, int srcID, long timestamp) {
+				int from = o.getIntAttribute(l2srcAttribute);
+				int to = o.getIntAttribute(l2dstAttribute);
+				Tuple tuple = Tuple.createTuple("LinkTuple");
+				tuple.setAttribute(idField, "" + from + "#" + to);
+				transfer(tuple, timestamp);
+			}
+		};
+		packetTracer.subscribe(linkEnumeratorData, 0);
+		// metric: nr of times a packet was sent across a link ..
+		TupleTimeWindowGroupAggregator linkDataLastEpoch = new TupleTimeWindowGroupAggregator(
+				W * dataPeriod, "linkID", new Counter("LinkData", "reports"),
+				"linkDataLastEpoch");
+		linkEnumeratorData.subscribe(linkDataLastEpoch, 0);
+
+		// connect to GUI
+		createGuiSink(dupFilter, linkAdvertisementMapper, metricStream,
+				eventStream, nodeStateChangeFilter, linkNeighboursLastEpoch,
+				linkDataLastEpoch, seqNrMapper, multiHopFilter,
+				pathAdvertisementMapper, linkBeaconFilter);
+
+		return crcFilter;
+	}
+
+	/**
+	 * @return
+	 */
+	private BinaryDecisionTree createDecisionTree() {
 		BinaryDecisionTree noPacketReceivedTest = new BinaryDecisionTree(
 				new TreeAttributePredicate("PacketsLastEpoch", "packets",
 						TreeAttributePredicate.Comparator.equal, 0));
@@ -589,96 +690,7 @@ public class EWSN extends SNIFController {
 
 
 		// end of tree
-
-		GroupingEvaluator stateDetector = GroupingEvaluator
-				.createBinaryTreeEvaluator(firstTest, "nodeID",
-						"stateDetector");
-		metricStream.subscribe(stateDetector, 0);
-
-		// get node state changes
-		Filter<Tuple> nodeStateChangeFilter = new Filter<Tuple>(
-				new TupleChangePredicate("nodeID"));
-		stateDetector.subscribe(nodeStateChangeFilter, 0);
-
-		// network partition detetction
-		int packetTracerID = 1;
-		int nodeStateChangeFilterID = 2;
-		TopologyAnalyzer partitionDetection = new TopologyAnalyzer(
-				theSink, W * pathAdvPeriod, 10 * 1000, nodeStateChangeFilterID,
-				packetTracerID);
-		packetTracer.subscribe(partitionDetection, packetTracerID);
-		nodeStateChangeFilter.subscribe(partitionDetection,
-				nodeStateChangeFilterID);
-		partitionDetection.subscribe(metricStream, 0);
-
-		// log to file
-		AbstractSink<Tuple> logger = new AbstractSink<Tuple>() {
-			public void process(Tuple o, int srcID, long timestamp) {
-				logLine(dsnLogWriter, "" + timestamp / 1000 + " -- "
-						+ o.toString());
-			}
-		};
-		nodeStateChangeFilter.subscribe(logger, 0);
-		eventStream.subscribe(logger, 0);
-
-		// metricStream.subscribe(logger, 0);
-		// routeAnalyzer.subscribe(logger, 0);
-		// packetTupleMapper.subscribe(logger, 0);		
-
-		// map "from", "to" -> "linkID=from#to
-		Tuple.registerTupleType("LinkTuple", "linkID");
-		AbstractPipe<Tuple, Tuple> linkEnumeratorNeighbours = new AbstractPipe<Tuple, Tuple>() {
-			final TupleAttribute idField = new TupleAttribute("linkID");
-
-			final TupleAttribute fromAttribute = new TupleAttribute(
-					"reportingNode");
-
-			final TupleAttribute toAttribute = new TupleAttribute("seenNode");
-
-			public void process(Tuple o, int srcID, long timestamp) {
-				int from = o.getIntAttribute(fromAttribute);
-				int to = o.getIntAttribute(toAttribute);
-				Tuple tuple = Tuple.createTuple("LinkTuple");
-				tuple.setAttribute(idField, "" + from + "#" + to);
-				transfer(tuple, timestamp);
-			}
-		};
-		linkAdvertisementMapper.subscribe(linkEnumeratorNeighbours, 0);
-		// metric: nr of times a neighbour was was reported last ..
-		TupleTimeWindowGroupAggregator linkNeighboursLastEpoch = new TupleTimeWindowGroupAggregator(
-				W * linkAdvPeriod, "linkID", new Counter("LinkListed",
-						"reports"), "linkNeighboursLastEpoch");
-		linkEnumeratorNeighbours.subscribe(linkNeighboursLastEpoch, 0);
-
-		AbstractPipe<Tuple, Tuple> linkEnumeratorData = new AbstractPipe<Tuple, Tuple>() {
-			final TupleAttribute idField = new TupleAttribute("linkID");
-
-			final TupleAttribute l2srcAttribute = new TupleAttribute("l2src");
-
-			final TupleAttribute l2dstAttribute = new TupleAttribute("l2dst");
-
-			public void process(Tuple o, int srcID, long timestamp) {
-				int from = o.getIntAttribute(l2srcAttribute);
-				int to = o.getIntAttribute(l2dstAttribute);
-				Tuple tuple = Tuple.createTuple("LinkTuple");
-				tuple.setAttribute(idField, "" + from + "#" + to);
-				transfer(tuple, timestamp);
-			}
-		};
-		packetTracer.subscribe(linkEnumeratorData, 0);
-		// metric: nr of times a packet was sent across a link ..
-		TupleTimeWindowGroupAggregator linkDataLastEpoch = new TupleTimeWindowGroupAggregator(
-				W * dataPeriod, "linkID", new Counter("LinkData", "reports"),
-				"linkDataLastEpoch");
-		linkEnumeratorData.subscribe(linkDataLastEpoch, 0);
-
-		// connect to GUI
-		createGuiSink(dupFilter, linkAdvertisementMapper, metricStream,
-				eventStream, nodeStateChangeFilter, linkNeighboursLastEpoch,
-				linkDataLastEpoch, seqNrMapper, multiHopFilter,
-				pathAdvertisementMapper, linkBeaconFilter);
-
-		return crcFilter;
+		return firstTest;
 	}
 
 	/**

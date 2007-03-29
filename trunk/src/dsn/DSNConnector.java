@@ -1,4 +1,6 @@
 package dsn;
+import gui.View;
+
 import java.io.IOException;
 
 import javax.bluetooth.BluetoothStateException;
@@ -30,8 +32,6 @@ public class DSNConnector extends Thread implements DiscoveryListener {
 
 	private DiscoveryAgent agent;
 
-	private DSNConnector view;
-	
 	private String snifGateway = null;
 
 	int  timeSyncRound = 0;
@@ -42,8 +42,11 @@ public class DSNConnector extends Thread implements DiscoveryListener {
 
 	private static PhyConfig snifConfig;
 
+	private View view = null;
+	
+	private boolean stopConnection = false;
+	
 	public void init() {
-		view = this;
 			LocalDevice local;
 			try {
 				local = LocalDevice.getLocalDevice();
@@ -56,20 +59,20 @@ public class DSNConnector extends Thread implements DiscoveryListener {
 	
 	public void deviceDiscovered(RemoteDevice btDevice, DeviceClass cod) {
 		String address = btDevice.getBluetoothAddress();
-		view.writeMessage("Found " + address +" , Service: "+cod.getServiceClasses()+", Major: "
-				+ cod.getMajorDeviceClass() + ", Minor: " + cod.getMinorDeviceClass());
 
 		if (snifGateway != null) return;
 
-		
 		if (address.startsWith(btPrefix)   &&
 //			cod.getServiceClasses() == 0   &&
 //			cod.getMajorDeviceClass() == SNIF_COD_MAJOR &&
 //			cod.getMinorDeviceClass() == SNIF_COD_MINOR &&
 			true	) {
-			view.writeMessage("BTNode " + address +" , Service: "+cod.getServiceClasses()+", Major: "
+			writeMessage("BTNode " + address +" , Service: "+cod.getServiceClasses()+", Major: "
 					+ cod.getMajorDeviceClass() + ", Minor: " + cod.getMinorDeviceClass());
 			snifGateway = address;
+		} else {
+			writeMessage("Found " + address +" , Service: "+cod.getServiceClasses()+", Major: "
+					+ cod.getMajorDeviceClass() + ", Minor: " + cod.getMinorDeviceClass());
 		}
 	}
 	
@@ -92,13 +95,11 @@ public class DSNConnector extends Thread implements DiscoveryListener {
 
 	}
 	
-	private void writeMessage(String s) {
-		System.out.println(s);
-	}	
-	
 	public void connect() {
-		while (true) {
-			view.writeMessage("Start discovery...");
+		stopConnection = false;
+		while (!stopConnection) {
+		
+			writeMessage("Start discovery...");
 			// Discover BTNodes
 			try {
 			    // start inquiry
@@ -107,31 +108,31 @@ public class DSNConnector extends Thread implements DiscoveryListener {
 
 			    // wait for max 10 seconds for inq result
 			    int i = 0;
-			    while (snifGateway == null && i < 100) {
+			    while (snifGateway == null && i < 100 && !stopConnection) {
 				    Thread.sleep(100);
 					i++;
 				}
 			    // stop inquiry
-				view.writeMessage("Stop discovery...");
+				writeMessage("Stop discovery...");
 			    agent.cancelInquiry(this);
 
 			    // wait a bit more
 			    Thread.sleep(200);
 
-			    if (snifGateway != null) {
+			    if (snifGateway != null && !stopConnection) {
 			    	// try to connect
 			    	writeMessage("Connecting to DSN via BTnode " + snifGateway);
 			    	con = (L2CAPConnection) Connector.open("btl2cap://" + snifGateway + ":1011");
 
 			    	// connected !!!
-			    	view.writeMessage("Connected to DSN via BTnode " + snifGateway);
+			    	writeMessage("Connected to DSN via BTnode " + snifGateway);
 			    	return;
 			    } else {
-			    	view.writeMessage("Retry...");
+			    	writeMessage("Retry...");
 			    }
 			}
 			catch (IOException ioex) {
-				view.writeMessage("Couldn't establish connection.\nPlease retry.");
+				writeMessage("Couldn't establish connection.\nPlease retry.");
 			}
 			catch (InterruptedException iex) {
 			}
@@ -160,33 +161,41 @@ public class DSNConnector extends Thread implements DiscoveryListener {
 		lastTimestamp = System.currentTimeMillis();
 	}
 	
+	/**
+	 * main DSN handler
+	 * 
+	 * pre: snifConfig available, connected to DSN
+	 */
 	public void run() {
+		stopConnection = false;
 		int timeSyncIntervalMillis = 10000;
 		lastTimestamp = System.currentTimeMillis();
-		while (true) {
-			try {
+		try {
+			while (!stopConnection) {
 				// check, if timestamp should be sent
 				if (System.currentTimeMillis() - lastTimestamp > timeSyncIntervalMillis) {
 					sendTimeStamp();
 					sendConfig(snifConfig);
 				}
 				// check for new packets
-				else if (con.ready() ) {
+				else if (con.ready()) {
 					receivePacket();
 				}
 				// sleep for 10 ms
 				else {
 					try {
-						Thread.sleep( 10 );
+						Thread.sleep(10);
 					} catch (InterruptedException e) {
 						// TODO Auto-generated catch block
 						e.printStackTrace();
 					}
 				}
-			} catch (IOException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
 			}
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} finally {
+			view.setBTConnection(null);
 		}
 	}
 	
@@ -202,6 +211,41 @@ public class DSNConnector extends Thread implements DiscoveryListener {
 		DSNConnector.snifConfig = snif_config;
 	}
 
+
+	public String getSnifGateway() {
+		return snifGateway;
+	}
+
+	private void writeMessage(String s) {
+		if (view == null) {
+			System.out.println(s);
+		} else {
+			view.writeMessage(s);
+		}
+	}	
+	
+
+	public void registerView(View view) {
+		this.view = view;
+	}
+	
+	/** 
+	 * if in discovery stop
+	 * if running stop
+	 *
+	 */
+	public void stopConnection() {
+		stopConnection = true;
+		if (this.isAlive()) {
+			try {
+				join();
+			} catch (InterruptedException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+		}
+	}
+
 	public static void main(String[] args) throws Exception {
 		PDL parser = PDL.readDescription( "packetdefinitions/ewsn07.h");
 		
@@ -212,11 +256,6 @@ public class DSNConnector extends Thread implements DiscoveryListener {
 		System.out.println();
 		connector.init();
 		connector.connect();
-		// connector.run();
 		connector.start();
-	}
-
-	public String getSnifGateway() {
-		return snifGateway;
 	}
 }
