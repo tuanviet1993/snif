@@ -157,20 +157,6 @@ HANDLE snif_config_queue;
 struct sniffer_config snif_config;
 
 /** timesync */
-u_char time_sync_round = 255;
-struct timestamp parentStamp;
-bt_hci_con_handle_t parentConHandle = BT_HCI_HANDLE_INVALID;
-bt_addr_t parentAddr;
-// clock offset (bit 2-16) obtained with bt_hci_read_clock_offset or with inquiry command
-u_long clock_offset_bit_2to16;
-// clock offset obtained by sending and receiving a bt timestamp over the air
-long  clock_offset_approx;
-// clock offset obtained by combining clock_offset_approx and acurate lower bits of clock offset
-long  offsetToParent;
-long  offsetToRoot;
-/** reference */
-u_long sample_bt_clock;
-u_long sample_nut_ticks;
 
 /** used to signal SNIF worker state machine */ 
 HANDLE snif_event_queue;
@@ -270,6 +256,364 @@ void packet_buffer_free(struct sniffed_packet * pkt){
 }
 
 
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////
+// 
+//  Time sync 
+//
+
+#define SNIF_MAX_NEIGHBORS 30
+#define SNIF_INQ_TIME 5
+#define SNIF_INQ_PERIOD 1*60
+#define SNIF_INQ_RANDOM 63
+#define SNIF_CLOCK_UPDATE_PERIOD 60
+#define BT_CLOCK_SAMPLES 10
+
+static void getBtClockSample(void);
+
+struct sync_neighbor {
+    bt_hci_con_handle_t handle;
+    u_short             offset;
+};
+
+struct bt_clock_sample {
+    u_long nut_ticks;
+    u_long nut_millis;
+    u_long bt_clock;
+};
+
+// latest clock offset per handle
+struct sync_neighbor sync_neighbors[BT_HCI_MAX_NUM_CON];
+
+// used for repeated inquiries
+struct bt_hci_inquiry_result inq_results[SNIF_MAX_NEIGHBORS];
+
+// latest BT_CLOCK_SAMPLES
+struct bt_clock_sample bt_clock_samples[BT_CLOCK_SAMPLES];
+
+u_char time_sync_round = 255;
+
+// pair: parentStamp & local bt clock
+struct timestamp parentStamp;
+u_long local_bt_clock ;
+bt_hci_con_handle_t parentConHandle = BT_HCI_HANDLE_INVALID;
+bt_addr_t parentAddr;
+
+// clock offset (bit 2-16) obtained with bt_hci_read_clock_offset or with inquiry command
+u_long clock_offset_bit_2to16;
+// clock offset obtained by sending and receiving a bt timestamp over the air
+long  clock_offset_approx;
+// clock offset obtained by combining clock_offset_approx and acurate lower bits of clock offset
+long  offsetToParent;
+long  offsetToRoot;
+/** reference */
+u_long sample_bt_clock;
+u_long sample_nut_ticks;
+u_long sample_nut_millis;
+
+/**
+ * init table
+ */
+void init_sync(void){
+    u_char i;
+    for (i=0;i<BT_HCI_MAX_NUM_CON;i++){
+        sync_neighbors[i].handle = BT_HCI_HANDLE_INVALID;
+    }
+    for (i=0;i<BT_CLOCK_SAMPLES;i++) {
+        getBtClockSample();
+    }
+}
+
+/**
+ * get bt/nut clock sample 
+ */
+static void getBtClockSample(void){
+
+    /*
+     u_char i;
+     for (i=0;i<10;i++){
+        printf("Nt %ld, Nm %ld, BT %ld\n", bt_clock_samples[i].nut_ticks,  bt_clock_samples[i].nut_millis,  bt_clock_samples[i].bt_clock);
+    }
+     */
+    
+    // shift samples
+    memcpy( &bt_clock_samples[0], &bt_clock_samples[1], sizeof(struct bt_clock_sample) * (BT_CLOCK_SAMPLES-1));
+    
+    // store new clock sample
+    bt_clock_samples[BT_CLOCK_SAMPLES-1].bt_clock = bt_hci_read_clock(bt_stack, BT_HCI_SYNC,0,
+                    BT_HCI_CON_HANDLE_OWN, NULL, &bt_clock_samples[BT_CLOCK_SAMPLES-1].nut_millis);  
+    bt_clock_samples[BT_CLOCK_SAMPLES-1].nut_ticks = NutGetTickCount();
+ }
+
+/**
+ * update bt/nut conversion
+ *
+ * sample_ .. contains best bt/nut clock sample pair
+ */
+static void updateBTnutClockConversion(void) {
+
+    printf("updateBTnutClockConversion\n");
+
+    // get new sample
+    getBtClockSample();
+    
+    // pick "best" sample
+    u_char i;
+    long highest_nuttime = 0;
+    long nuttime;
+    u_char best = 0;
+    // for sample #0: highest_nuttime = 0
+    for (i=1; i<BT_CLOCK_SAMPLES;i++){
+        nuttime = (bt_clock_samples[i].bt_clock-bt_clock_samples[0].bt_clock)
+             - (bt_clock_samples[i].nut_millis-bt_clock_samples[0].nut_millis)*16/5;
+        if ( nuttime > highest_nuttime){
+            highest_nuttime = nuttime;
+            best = i;
+        }
+    }
+    sample_bt_clock   = bt_clock_samples[best].bt_clock;
+    sample_nut_ticks  = bt_clock_samples[best].nut_ticks;
+    sample_nut_millis = bt_clock_samples[best].nut_millis;
+
+    printf("Sample: millis %lu, ticks %lu, bt %lu\n", sample_nut_millis, sample_nut_ticks, sample_bt_clock);
+}
+
+/**
+ * store (unmodified) clock offset for a given handle
+ */ 
+static inline
+void storeClockOffset( bt_hci_con_handle_t handle, u_short offset) {
+    u_char i;
+    // try to find handle
+    for (i=0;i<BT_HCI_MAX_NUM_CON;i++){
+        if (sync_neighbors[i].handle == handle) {
+            sync_neighbors[i].offset = offset;
+            return;
+        }
+    }
+    // try to find closed connection
+    for (i=0;i<BT_HCI_MAX_NUM_CON;i++){
+        if (bt_hci_is_con_open(bt_stack, sync_neighbors[i].handle) != 0) {
+            sync_neighbors[i].handle = handle;
+            sync_neighbors[i].offset = offset;
+            return;
+        }
+    }
+}
+
+/**
+ * get clock offset for handle
+ * @return clock offset (0-0x7fff or -1 = 0xffff)
+ */
+u_short getClockOffset( bt_hci_con_handle_t handle){
+    u_char i;
+    // try to find handle
+    for (i=0;i<BT_HCI_MAX_NUM_CON;i++){
+        if (sync_neighbors[i].handle == handle) {
+            return sync_neighbors[i].offset;
+        }
+    }
+    return -1;
+}
+
+/**
+ * update clock offset to parent node
+ *
+ * input:
+ * parentStamp.bt_clock:   parent bt clock
+ * local_bt_clock:         local  bt clock at time of arrival of parentStamp
+ * clock_offset_bit_2to16: (accurate) lower bits of BT clock offset
+ *
+ * output:
+ * offsetToParent, offsetToRoot
+ */
+void updateClockOffset(void){
+    
+    // check for sync root
+    if (snif_am_sink) {
+        offsetToParent = 0;
+        offsetToRoot   = 0;
+        return;
+    }
+    
+    // if no previous clock offset from inquiry is available, use bt_hci_read_clock_offset
+    if (clock_offset_bit_2to16 == 0xffffffff) {
+        long res = bt_hci_read_clock_offset(bt_stack, BT_HCI_SYNC, parentConHandle);
+        printf("bt_hci_read_clock_offset: %ld\n", res);
+        clock_offset_bit_2to16 = res << 2;
+    }
+    
+    // calculate parent bt clock
+    u_char role = (u_char) bt_hci_local_role_discovery( bt_stack, parentConHandle);
+    clock_offset_approx = 0;
+    if (role == BT_HCI_MY_ROLE_SLAVE) {
+        clock_offset_approx = local_bt_clock - parentStamp.bt_clock;
+        if ( (clock_offset_approx & 0x1ffff) < clock_offset_bit_2to16){
+            clock_offset_approx -= 0x20000;
+        }
+        long clock_offset_slaveToMaster = (clock_offset_approx & 0xfffe0000) | clock_offset_bit_2to16;
+        offsetToParent = - clock_offset_slaveToMaster;
+    } else {
+        clock_offset_approx = parentStamp.bt_clock - local_bt_clock;
+        if ( (clock_offset_approx & 0x1ffff) > clock_offset_bit_2to16){
+            clock_offset_approx += 0x20000;
+        }
+        long clock_offset_slaveToMaster = (clock_offset_approx & 0xfffe0000) | clock_offset_bit_2to16;
+        offsetToParent = clock_offset_slaveToMaster;
+    }
+    
+    // calculate root bt clock
+    offsetToRoot = offsetToParent + parentStamp.root_bt_clock_offset;
+    printf("OffsetToParent: %ld (%lu) \n", offsetToParent, clock_offset_bit_2to16);
+}
+
+/**
+ * update clock offsets to neighbours
+ */
+static void updateClockOffsets(void){
+    long res;
+    u_char nr_results;
+    short i;
+
+    printf("updateClockOffsets\n");
+    
+    // inquiry, SNIF_INQ_TIME * 1.28 s
+    res = bt_hci_inquiry( bt_stack, BT_HCI_SYNC, SNIF_INQ_TIME, SNIF_MAX_NEIGHBORS, inq_results);
+    printf("res %ld\n", res);
+    if (res < 0) {
+        return;
+    }
+    nr_results = (u_short) res;
+    // update neighbor delta
+    for (i=0; i < nr_results; i++) {
+        res = bt_hci_get_con_handle( bt_stack, inq_results[i].bdaddr);
+        u_short clock_offset = inq_results[i].clock_offset & 0x7fff;
+        if (res != BT_ERR_NO_CON) {
+            printf("inq: "ADDR_FMT" handle %u offset %u \n", ADDR(inq_results[i].bdaddr), (u_short) res, clock_offset);
+            // store offset
+            storeClockOffset( (u_short) res, clock_offset);
+            // update clock offset
+            if (parentConHandle == (u_short) res) {
+                // check for role: clock offsets on inquiry is independent from connection 
+                u_char role = (u_char) bt_hci_local_role_discovery( bt_stack, parentConHandle);
+                if (role == BT_HCI_MY_ROLE_SLAVE) {
+                    clock_offset = 0x8000 - clock_offset;
+                }
+                clock_offset_bit_2to16 = ((u_long) clock_offset) << 2;
+                printf("Using offset: %lu for link\n", clock_offset_bit_2to16);
+                updateClockOffset();
+            }
+        } else {
+            printf("inq: "ADDR_FMT" offset %u \n", ADDR(inq_results[i].bdaddr), clock_offset);
+        }
+    }
+}
+
+/** 
+ * Periodic time services
+ *
+ * jobs: do an inquiries to learn about clock offset to neigbhours
+ *       and continously update nut/bt clock conversion
+ * 
+ */
+THREAD( TIME, arg ) {
+    u_long nextClockUpdate = 0;
+    u_long nextInquiry = 0;
+    u_long nextAction;
+    u_long time;
+    init_sync();
+    while (1) {
+        time = NutGetMillis();
+        if (time >= nextInquiry) {
+            updateClockOffsets();
+            nextInquiry = time + 1000L * (SNIF_INQ_PERIOD + (rand() & SNIF_INQ_RANDOM));
+        }
+        if (time >= nextClockUpdate) {
+            updateBTnutClockConversion();
+            nextClockUpdate = time + 1000L * SNIF_CLOCK_UPDATE_PERIOD;
+        }
+        // sleep until next action
+        if (nextInquiry < nextClockUpdate) {
+            nextAction = nextInquiry;
+        } else {
+            nextAction = nextClockUpdate;
+        }
+        NutSleep( nextAction - time);
+    }
+}
+
+
+
+/** 
+* timestamp received
+* - update time
+* - send own time
+*/
+static bt_acl_pkt_buf* cl_timestamp(bt_acl_pkt_buf* pkt_buf,
+									u_char* data,
+									u_short data_len,
+									u_short service_nr,
+									void* cb_arg)
+{
+	struct timestamp * t = (struct timestamp *) data;
+    bt_hci_con_handle_t newParent;
+	// printf("cl_timestamp with round %u, last round %u\n", t->sync_round, time_sync_round);
+	if ( t->sync_round != time_sync_round) {
+        time_sync_round = t->sync_round;
+        memcpy( (void*) &parentStamp, data, sizeof (struct timestamp));
+        newParent = bt_acl_get_con_handle( pkt_buf->pkt);
+        if (newParent != parentConHandle) {
+            parentConHandle = newParent;
+            bt_hci_get_remote_bt_addr( bt_stack, parentConHandle, parentAddr);
+            // get stored clock offset, if not available -1 = 0xffffffff is used
+            u_short clockOffsetForHandle = getClockOffset( parentConHandle);
+            if (clockOffsetForHandle == 0xffff) {
+                clock_offset_bit_2to16 = 0xffffffff;
+            } else {
+                clock_offset_bit_2to16 = ((u_long) clockOffsetForHandle) << 2;
+            }
+        }
+        snif_send_timestamp = 1;
+        NutEventPost(&snif_event_queue);
+	}
+	
+	// free the received message
+	return pkt_buf;
+}
+
+/**
+ * send timestamp to mhop neighbours 
+ */
+void sendTimeStamp(void){
+    u_char i;
+    u_char num_cons;
+    bt_hci_con_handle_t con_handle;
+	struct timestamp t;
+
+    // get (approx.) current bt clock
+    local_bt_clock = bt_hci_read_clock(bt_stack, BT_HCI_SYNC,0, BT_HCI_CON_HANDLE_OWN, NULL, NULL);
+
+    // update clock offset to 
+    updateClockOffset();
+
+    // fill in packet
+    t.bt_clock = local_bt_clock;
+	t.sync_round = time_sync_round;
+    t.root_bt_clock_offset = offsetToRoot;
+    bt_hci_get_local_bt_addr( bt_stack, t.bt_addr);
+    printf("Timesync: Root BT clock %lu: my BT clock %lu, parent BT clock %lu, Round %u\n", t.bt_clock + offsetToRoot, t.bt_clock, t.bt_clock + offsetToParent, time_sync_round);
+    
+    // send my clock to all children down the tree to re-inforce it
+    num_cons = con_mgr_get_rel_cons( rel_cons);
+    for (i=0;i<num_cons;i++){
+        // get handle of connection
+        con_handle = rel_cons[i];
+        if (con_handle != parentConHandle) {
+            l2cap_cl_send((void*)&t, sizeof(struct timestamp), con_handle, SNIF_TIMESTAMP_PSM);
+        }
+    }	
+}
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////////
 // 
 //  l2cap-cl (mhop) and l2cap data and connection handler
@@ -285,14 +629,14 @@ static bt_acl_pkt_buf* cl_timestamp(bt_acl_pkt_buf* pkt_buf,
 void print_hex_data( char *format, u_char *data, u_char len) {
     int i;
     printf(format, len);
-        for (i=0;i<len;i++) {
-            printf("%02x ", data[i]); 
+    for (i=0;i<len;i++) {
+        printf("%02x ", data[i]); 
     }
     printf("\n");
 }
 
 /**
- * \brief Data callbacks for the various snif packet services
+* \brief Data callbacks for the various snif packet services
  * 
  * This callback is called each time a snif cl packed arrives.
  * 
@@ -304,22 +648,22 @@ void print_hex_data( char *format, u_char *data, u_char len) {
  * the protocol/service multiplexor (see #mhop_blink_service_register).
  * Unused in this example.
  */
- 
+
 /** 
- * config data received
- * - store config
- * - store sink address
- */
+* config data received
+* - store config
+* - store sink address
+*/
 static bt_acl_pkt_buf* cl_config(bt_acl_pkt_buf* pkt_buf,
-									u_char* data,
-									u_short data_len,
-									u_short service_nr,
-									void* cb_arg)
+                                 u_char* data,
+                                 u_short data_len,
+                                 u_short service_nr,
+                                 void* cb_arg)
 {
 	u_char * source;
 	source = (u_char*) mhop_cl_get_source_addr(pkt_buf->pkt);
 	// printf("cl_config, source "ADDR_FMT"\n", ADDR(source));
-
+    
 	// store config
     // print_hex_data( "SNIFFER: cl_data config data(%u): ", (void*) data, sizeof(struct sniffer_config));
 	memcpy ( (void*) &snif_config, data, sizeof(struct sniffer_config));
@@ -343,14 +687,14 @@ static bt_acl_pkt_buf* cl_config(bt_acl_pkt_buf* pkt_buf,
 
 
 /**
- * sniffed packet received 
+* sniffed packet received 
  * - copy into queue
  */
 static bt_acl_pkt_buf* cl_sniffed(bt_acl_pkt_buf* pkt_buf,
-									u_char* data,
-									u_short data_len,
-									u_short service_nr,
-									void* cb_arg)
+                                  u_char* data,
+                                  u_short data_len,
+                                  u_short service_nr,
+                                  void* cb_arg)
 {
 	struct sniffed_packet * packet;
 	u_char * source;
@@ -362,7 +706,7 @@ static bt_acl_pkt_buf* cl_sniffed(bt_acl_pkt_buf* pkt_buf,
 	if (packet) {
 		memcpy( (void*) &packet->bt_addr, (void *) data, data_len);
 		packet_queue_insert( packet, packet->timestamp);
-	
+        
 		// ping worker
 		NutEventPost(&snif_event_queue);
 	} else {
@@ -377,7 +721,7 @@ static void _snif_co_data_cb(struct bt_l2cap_acl_pkt *pkt, u_char service_nr, u_
 {
 	enum SNIF_PACKET_TYPES type = pkt->payload[0];
     // print_hex_data( "SNIFFER: L2CAP DATA received (%u): ", (u_char*) &pkt->payload, pkt->len[0] | (pkt->len[1] << 8));
-
+    
 	switch (type) {
 		case config:
     		// store config, set and broadcast it
@@ -420,7 +764,7 @@ static void _snif_con_cb(u_char type, u_char detail, u_char service_nr, u_short 
 
 
 /**
- * \brief Registers the "snif" service at the protocol/service multiplexor
+* \brief Registers the "snif" service at the protocol/service multiplexor
  * 
  * For that the "snif" service is accessible by remote devices, it has
  * to be registered at the protocol/service multiplexor: On a receiving device,
@@ -438,249 +782,25 @@ void snif_cl_service_register(bt_psm_t* psmux)
 	// register "snif_config" service at psmux
 	snif_service_nr = bt_psm_service_register(psmux, SNIF_CONFIG_PSM, cl_config, NULL);
 	bt_psm_service_set_buffers(psmux, snif_service_nr, NULL);
-
+    
 	// register "snif_timestamp" service at psmux
 	snif_service_nr = bt_psm_service_register(psmux, SNIF_TIMESTAMP_PSM, cl_timestamp, NULL);
 	bt_psm_service_set_buffers(psmux, snif_service_nr, NULL);
-
+    
 	// register "snif_sniffed" service at psmux
 	snif_service_nr = bt_psm_service_register(psmux, SNIF_PACKET_PSM, cl_sniffed, NULL);
 	bt_psm_service_set_buffers(psmux, snif_service_nr, NULL);
-
+    
 }
 
 /**
- * register l2cap snif service
+* register l2cap snif service
  */
 void snif_co_service_register(struct bt_l2cap_stack *stack, u_char nr_buffer, u_short min_mtu, u_short max_mtu)
 {
     l2cap_service = bt_l2cap_register_service(SNIF_L2CAP_PSM, nr_buffer, min_mtu, max_mtu, _snif_con_cb, _snif_co_data_cb, NULL);
 }
 
-///////////////////////////////////////////////////////////////////////////////////////////////////////
-// 
-//  Time sync 
-//
-
-#define SNIF_MAX_NEIGHBORS 30
-#define SNIF_INQ_TIME 5
-#define SNIF_INQ_PERIOD 5*60
-#define SNIF_INQ_RANDOM 63
-
-struct sync_neighbor {
-    bt_hci_con_handle_t handle;
-    u_short             offset;
-};
-
-// latest clock offset per handle
-struct sync_neighbor sync_neighbors[BT_HCI_MAX_NUM_CON];
-
-// used for repeated inquiries
-struct bt_hci_inquiry_result inq_results[SNIF_MAX_NEIGHBORS];
-
-/**
- * init table
- */
-void init_sync(void){
-    u_char i;
-    for (i=0;i<BT_HCI_MAX_NUM_CON;i++){
-        sync_neighbors[i].handle = BT_HCI_HANDLE_INVALID;
-    }
-}
-
-/**
- * store reference sample of bt clock vs nut ticks
- */
-static void getBtClockSample(void) {
-    sample_bt_clock = bt_hci_read_clock(bt_stack, BT_HCI_SYNC,0, BT_HCI_CON_HANDLE_OWN, NULL, NULL);  
-    sample_nut_ticks = NutGetTickCount();
-}
-
-/**
- * store clock offset for a given handle
- */ 
-static inline
-void storeClockOffset( bt_hci_con_handle_t handle, u_short offset) {
-    u_char i;
-    // try to find handle
-    for (i=0;i<BT_HCI_MAX_NUM_CON;i++){
-        if (sync_neighbors[i].handle == handle) {
-            sync_neighbors[i].offset = offset;
-            return;
-        }
-    }
-    // try to find closed connection
-    for (i=0;i<BT_HCI_MAX_NUM_CON;i++){
-        if (bt_hci_is_con_open(bt_stack, sync_neighbors[i].handle) != 0) {
-            sync_neighbors[i].handle = handle;
-            sync_neighbors[i].offset = offset;
-            return;
-        }
-    }
-}
-
-long getClockOffset( bt_hci_con_handle_t handle){
-    u_char i;
-    // try to find handle
-    for (i=0;i<BT_HCI_MAX_NUM_CON;i++){
-        if (sync_neighbors[i].handle == handle) {
-            return sync_neighbors[i].offset;
-        }
-    }
-    return -1;
-}
-
-/**
- * update clock offset to parent node
- *
- * input:
- * parentStamp.bt_clock:   parent bt clock
- * sample_bt_clock:        local  bt clock
- * clock_offset_bit_2to16: accurate lower bits of offset
- * 
- */
-void updateClockOffset(void){
-    
-    // get clock sample
-    getBtClockSample();
-    
-    // check for sync root
-    if (snif_am_sink) {
-        offsetToParent = 0;
-        offsetToRoot   = 0;
-        return;
-    }
-    
-    // if no previous clock offset from inquiry is available, use bt_hci_read_clock_offset
-    if (clock_offset_bit_2to16 == 0xffffffff) {
-        clock_offset_bit_2to16 = bt_hci_read_clock_offset(bt_stack, BT_HCI_SYNC, parentConHandle) << 2;
-    }
-    
-    // calculate parent bt clock
-    u_char role = (u_char) bt_hci_local_role_discovery( bt_stack, parentConHandle);
-    clock_offset_approx = 0;
-    if (role == BT_HCI_MY_ROLE_SLAVE) {
-        clock_offset_approx = sample_bt_clock - parentStamp.bt_clock;
-        if ( (clock_offset_approx & 0x1ffff) < clock_offset_bit_2to16){
-            clock_offset_approx -= 0x20000;
-        }
-        long clock_offset_slaveToMaster = (clock_offset_approx & 0xfffe0000) | clock_offset_bit_2to16;
-        offsetToParent = - clock_offset_slaveToMaster;
-    } else {
-        clock_offset_approx = parentStamp.bt_clock - sample_bt_clock;
-        if ( (clock_offset_approx & 0x1ffff) > clock_offset_bit_2to16){
-            clock_offset_approx += 0x20000;
-        }
-        long clock_offset_slaveToMaster = (clock_offset_approx & 0xfffe0000) | clock_offset_bit_2to16;
-        offsetToParent = clock_offset_slaveToMaster;
-    }
-    
-    // calculate root bt clock
-    offsetToRoot = offsetToParent + parentStamp.root_bt_clock_offset;
-}
-
-/** 
- * Periodic time services
- *
- * main job: do an inquiry to learn about clock offset to neigbhours
- * 
- */
-THREAD( TIME, arg ) {
-    long res;
-    short i;
-    init_sync();
-    while (1) {
-        // inquiry, SNIF_INQ_TIME * 1.28 s
-        res = bt_hci_inquiry( bt_stack, BT_HCI_SYNC, SNIF_INQ_TIME, SNIF_MAX_NEIGHBORS, inq_results);
-        // update neighbor delta
-        for (i=0; i < res; i++) {
-            res = bt_hci_get_con_handle( bt_stack, inq_results[i].bdaddr);
-            if (res >= 0) {
-                // show
-                printf("Clock offset to "ADDR_FMT" %u\n", ADDR(inq_results[i].bdaddr), inq_results[i].clock_offset);
-                
-                // store offset
-                storeClockOffset( (u_short) res, inq_results[i].clock_offset << 2);
-                
-                // update clock offset
-                if (parentConHandle == (u_short) res) {
-                    clock_offset_bit_2to16 = inq_results[i].clock_offset << 2;
-                    updateClockOffset();
-                }
-            }
-        }
-        // sleep for SNIF_INQ_PERIOD + (0..1)*SNIF_INQ_RANDOM
-        NutSleep( 1000L* (SNIF_INQ_PERIOD + (rand() & SNIF_INQ_RANDOM)) );
-    }
-}
-
-
-
-/** 
-* timestamp received
-* - update time
-* - send own time
-*/
-static bt_acl_pkt_buf* cl_timestamp(bt_acl_pkt_buf* pkt_buf,
-									u_char* data,
-									u_short data_len,
-									u_short service_nr,
-									void* cb_arg)
-{
-	struct timestamp * t = (struct timestamp *) data;
-    bt_hci_con_handle_t newParent;
-	// printf("cl_timestamp with round %u, last round %u\n", t->sync_round, time_sync_round);
-	if ( t->sync_round != time_sync_round) {
-        time_sync_round = t->sync_round;
-        memcpy( (void*) &parentStamp, data, sizeof (struct timestamp));
-        newParent = bt_acl_get_con_handle( pkt_buf->pkt);
-        if (newParent != parentConHandle) {
-            parentConHandle = newParent;
-            bt_hci_get_remote_bt_addr( bt_stack, parentConHandle, parentAddr);
-            // get stored clock offset, if not available -1 = 0xffffffff is used
-            clock_offset_bit_2to16 = getClockOffset( parentConHandle);
-        }
-//        printf("parentStamp: handle %u addr "ADDR_FMT" time: %lu offsetToRoot %ld\n",
-//               parentConHandle, ADDR(parentAddr), parentStamp.bt_clock, parentStamp.root_bt_clock_offset);
-        snif_send_timestamp = 1;
-        NutEventPost(&snif_event_queue);
-	}
-	
-	// free the received message
-	return pkt_buf;
-}
-
-/**
- * send timestamp to mhop neighbours 
- */
-void sendTimeStamp(void){
-    u_char i;
-    u_char num_cons;
-    bt_hci_con_handle_t con_handle;
-	struct timestamp t;
-    
-	// printf("sendTimeStamp\n");
-    
-    // update time sync
-    updateClockOffset();
-
-    // fill in packet
-    t.bt_clock = sample_bt_clock;
-	t.sync_round = time_sync_round;
-    t.root_bt_clock_offset = offsetToRoot;
-    bt_hci_get_local_bt_addr( bt_stack, t.bt_addr);
-    printf("Timesync: Root BT clock %lu: my BT clock %lu, parent BT clock %lu, Round %u\n", t.bt_clock + offsetToRoot, t.bt_clock, t.bt_clock + offsetToParent, time_sync_round);
-    
-    // send my clock to all children down the tree to re-inforce it
-    num_cons = con_mgr_get_rel_cons( rel_cons);
-    for (i=0;i<num_cons;i++){
-        // get handle of connection
-        con_handle = rel_cons[i];
-        if (con_handle != parentConHandle) {
-            l2cap_cl_send((void*)&t, sizeof(struct timestamp), con_handle, SNIF_TIMESTAMP_PSM);
-        }
-    }	
-}
 ///////////////////////////////////////////////////////////////////////////////////////////////////////
 // 
 //  SNIF state machine 
