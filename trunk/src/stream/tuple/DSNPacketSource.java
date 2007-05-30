@@ -11,13 +11,13 @@ import stream.RealTime;
 
 public class DSNPacketSource extends AbstractSource<PacketTuple> implements RealTime, PacketListener {
 
+	private static final int De_JITTER_DELAY = 5000;
 	private PDL parser;
 	private TreeMap<Long,PacketTuple> packets = new TreeMap<Long,PacketTuple>(); 
 	private boolean haveTime = false;
 
-	private long btClockRef;
 	private long firstPacketMillis = 0;
-	
+	private long refTimestamp = 0;
 	/**
 	 * @param dsnConnection2
 	 * @param parser
@@ -33,11 +33,11 @@ public class DSNPacketSource extends AbstractSource<PacketTuple> implements Real
 		PacketTuple packet;
 		synchronized (packets) {
 			long key = packets.firstKey();
-			// System.out.println("Packet Time: "+key + " = " + getTimeMillisForBTClock(key));
+			// System.out.println("Packet Time: ("+key + ") " + (key - refTimestamp) );
 			packet = packets.get(key);
 			packets.remove(key);
+			packet.setTime(packet.getTime() - refTimestamp);
 		}
-		packet.setTime(getTimeMillisForBTClock(packet.getTime()));
 		return packet;
 	}
 
@@ -50,9 +50,10 @@ public class DSNPacketSource extends AbstractSource<PacketTuple> implements Real
 				return false;
 
 			long key = packets.firstKey();
-			long simulationTime = System.currentTimeMillis() - firstPacketMillis;
-			long age = simulationTime - getTimeMillisForBTClock(key);
-			return (age > 5000);
+			// time in simulation
+			long simulationTime = System.currentTimeMillis() - firstPacketMillis ; 
+			long packetTime = key - refTimestamp;
+			return (simulationTime - packetTime > De_JITTER_DELAY);
 		}
 	}
 
@@ -78,8 +79,9 @@ public class DSNPacketSource extends AbstractSource<PacketTuple> implements Real
 				if (firstPacketMillis == 0) {
 					firstPacketMillis = System.currentTimeMillis();
 				} else {
-					if (System.currentTimeMillis() - firstPacketMillis > 5000) {
-						btClockRef = packets.firstKey();
+					if (System.currentTimeMillis() - firstPacketMillis > De_JITTER_DELAY) {
+						refTimestamp = packets.firstKey();
+						System.out.println("refTimestamp "+ refTimestamp);
 						haveTime = true;
 					}
 				}
@@ -87,10 +89,6 @@ public class DSNPacketSource extends AbstractSource<PacketTuple> implements Real
 		}		
 	}
 
-	long getTimeMillisForBTClock( long btClock) {
-		return (long) ((float) (btClock-btClockRef) * 0.3125);
-	}
-	
 	static private int unsignedByteToInt(byte value) {
 		if (value >= 0) return value;
 		return value+256;

@@ -4,13 +4,11 @@ LEDs
 - replace CM blink by LEDs for sync pulse + received packet
 
 CODE
+
 - extract buffer handling (init: buffer count, buffer size)
-- extract BT/Nut clock sampling and conversion
-  - init: get X values
-  - updateBtNutClockConversion(periodidc)
-- add clock offset to contable ??
-- extract BT clock offset calculation (inc. inq)
-   - init
-   - inquiry: keep clock offset of neighbours 
-   - calc total clock offset
-- clean up time sync code / make re-usable
+
+- integrate clock offset access to btnut
+  - add clock offset to contable
+  - update clock offsets on inquiry
+  - provide "last inquiry" timestamp
+-> less inquiries for time sync

@@ -408,31 +408,40 @@ void main(void) {
 	btn_hardware_init();
 	btn_led_init(1);
 
+    init_printf();
+    printf("mc routing booting..\n");
+
     // get node addr
     node_addr = getID(NULL);
     
     // use addr for random
     srand( node_addr );
-    
+
 	// set sink state for node 234 and another one
-	if (node_addr == 0xea || node_addr == 0x8f ){
+	if (node_addr == 0xea || node_addr == 0x185){
 		I_AM_SINK = 1;
 	}
-	
+
+    printf("ID %03x", node_addr);
+    printf("Version "PROGRAM_VERSION"\n");
+    printf("AppVersion = %u. \n",APP_VERSION);
+    printf("I_AM_SINK  = %u\n", I_AM_SINK);
+	printf("battery = %u 1/1000 V\n", btn_bat_measure(10));
+    
     // init radio
+    printf("init cc1000...\n");
     init_radio(node_addr);
 
     // INSOMNIA! sleep mode causes chipcon reception to collapse
     NutThreadSetSleepMode(SLEEP_MODE_NONE);
 
     // init sensors
+    printf("init btsense...\n");
 	btsense_init(BTSENSE_REVISION_1_1);
-	
-    init_printf();
-    printf("mc_routing started. Version "PROGRAM_VERSION". AppVersion = %u. ID = %03x, I_AM_SINK = %u\n", APP_VERSION, node_addr, I_AM_SINK);
-	printf("Battery = %u\n", btn_bat_measure(10));
+
 
 	// register packet handlers
+    printf("register handlers...\n");
 	ccc_register_packet_handler(BEACON_TYPE, beacon_handler);
 	ccc_register_packet_handler(ADVERT_TYPE, advert_handler);
 	if ( I_AM_SINK == 0) {
@@ -473,7 +482,9 @@ void main(void) {
 	
 	V = 0;
 	D = MAX_USHORT;
-	
+
+    printf("running.\n");
+
 	for(;;) {
 	
 		// construct and send beacon
