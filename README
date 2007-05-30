@@ -1,11 +1,16 @@
 README for Sensor Network Inspection Framework
 
 REQUIREMENTS
+
 1. A JSR-82 implementation if live data should be received from the distributed sniffer
 Note that the Bluetooth Stack of Windows XP does not support L2CAP, so there is no
 JSR-82 implementation which can provide L2CAP connections on top of that.
 The JSR-82 BT stack from avetana works on top of a widcomm stack.
 The avetana bt stack is fine for linux (even free) and mac os x.
+
+2. The complete BTnode Development Envrionment
+You need the CVS HEAD version of BTnut, BTnut Release 1.8 is not sufficient.
+It is available at http://www.btnode.ethz.ch
 
 
 COMPILE

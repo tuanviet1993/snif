@@ -28,7 +28,7 @@ public class DSNConnector extends Thread implements DiscoveryListener {
 
 	private L2CAPConnection con;
 	
-	private final String btPrefix = "00043F000";
+	private final String btPrefix = "00043F00";
 
 	private DiscoveryAgent agent;
 
@@ -36,8 +36,6 @@ public class DSNConnector extends Thread implements DiscoveryListener {
 
 	int  timeSyncRound = 0;
 
-	long lastTimestamp = 0;
-	
 	private PacketListener packetListener;
 
 	private static PhyConfig snifConfig;
@@ -108,9 +106,10 @@ public class DSNConnector extends Thread implements DiscoveryListener {
 
 			    // wait for max 10 seconds for inq result
 			    int i = 0;
-			    while (snifGateway == null && i < 100 && !stopConnection) {
-				    Thread.sleep(100);
+			    while (snifGateway == null && i < 150 && !stopConnection) {
+				    Thread.sleep(200);
 					i++;
+					System.out.print(".");
 				}
 			    // stop inquiry
 				writeMessage("Stop discovery...");
@@ -154,13 +153,6 @@ public class DSNConnector extends Thread implements DiscoveryListener {
 		}
 	}
 	
-	private void sendTimeStamp() throws IOException {
-		byte packet [] = { 't', 0};
-		packet[1] = (byte) timeSyncRound++; 
-		con.send(packet);
-		lastTimestamp = System.currentTimeMillis();
-	}
-	
 	/**
 	 * main DSN handler
 	 * 
@@ -169,13 +161,13 @@ public class DSNConnector extends Thread implements DiscoveryListener {
 	public void run() {
 		stopConnection = false;
 		int timeSyncIntervalMillis = 10000;
-		lastTimestamp = System.currentTimeMillis();
+		long lastTimestamp = 0;
 		try {
 			while (!stopConnection) {
 				// check, if timestamp should be sent
 				if (System.currentTimeMillis() - lastTimestamp > timeSyncIntervalMillis) {
-					sendTimeStamp();
 					sendConfig(snifConfig);
+					lastTimestamp = System.currentTimeMillis();
 				}
 				// check for new packets
 				else if (con.ready()) {
@@ -217,8 +209,9 @@ public class DSNConnector extends Thread implements DiscoveryListener {
 	}
 
 	private void writeMessage(String s) {
+		System.out.println(s);
 		if (view == null) {
-			System.out.println(s);
+			// System.out.println(s);
 		} else {
 			view.writeMessage(s);
 		}

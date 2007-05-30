@@ -4,5 +4,6 @@ Code improvements
 - Provide getter methods for time window size (remove duplicate code)
 - Provide generic interface to map tuples to metric info
 - TopologyAnalyzer code is not very efficient (re-write)
+- Handle DNS disconnect (just exit threads, update gui, show state)
 
 New Features
