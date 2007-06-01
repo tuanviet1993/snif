@@ -243,6 +243,8 @@ public class PDL {
 		parser.types.put("short", new TypeSpecifier("short", 1, 2, true));
 		parser.types.put("int",   new TypeSpecifier("int",   1, 2, true));
 		parser.types.put("long",       new TypeSpecifier("long",  1, 4, true));
+		parser.types.put("uint32_t", new TypeSpecifier("uint32_t", 1, 4, false));
+		parser.types.put( "int32_t", new TypeSpecifier( "int32_t", 1, 4, true));
 		parser.types.put("uint16_t", new TypeSpecifier("uint16_t", 1, 2, false));
 		parser.types.put( "int16_t", new TypeSpecifier( "int16_t", 1, 2, true));
 		parser.types.put("uint8_t",  new TypeSpecifier("uint8_t",  1, 1, false));
