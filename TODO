@@ -4,6 +4,23 @@ Code improvements
 - Provide getter methods for time window size (remove duplicate code)
 - Provide generic interface to map tuples to metric info
 - TopologyAnalyzer code is not very efficient (re-write)
-- Handle DNS disconnect (just exit threads, update gui, show state)
 
 New Features
+- Set sniffer frequency based on config file (and test)
+- Packet Description Parser (PDL)
+  - support hexadecimal numbers
+  - support #define A 2
+  - support __attribute__((__packed__))
+  - compile error: unknown CONSTANT in guard condition -> NumberFormatException (=> give proper error)
+  - compile error: unknown parent type: error msg without line number
+    Parent struct or type ccc_packetst not defined
+  - pretty print could also show actual array sizes, e.g., data[15]
+  - pretty print could print hex, if packet cannot be decoded further
+
+New Operators:
+- Duplicate Counter (Timeout for last duplicate, distinct fields (incl. equal operator))
+- FIFO Check. Similar to SeqNr reboot detector. detects FIFO violations
+- LOGIC operator. E.g. to specify "No Route Requests after Route Reply Ack"
+
+Bugs:
+- CRC in pretty print wrong
