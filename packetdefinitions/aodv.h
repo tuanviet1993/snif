@@ -34,35 +34,35 @@ typedef uint8_t  u_char;
 
 
 /** bmac header used by link layer */
-struct bmac_msg_st {
+typedef struct bmac_msg_st {
     u_short source; 
     u_short destination;    
     u_char length;
     u_char flags; 
     u_char data[length];
     u_short crc;
-};
+} bmac_msg_t;
 
 /** chipcon communication header */
-struct ccc_packet_st : bmac_msg_st.data {
+typedef struct ccc_packet_st : bmac_msg_st.data {
     u_short src;     ///< source of the packet
     u_short dst;     ///< destination of the packet
     u_short length;  ///< payload length
     u_char type;     ///< packet type
     u_char data[];   ///< payload data
-};
+} ccc_packet_t; 
 
 /** AODV packet */
-struct aodv_packet_st : ccc_packet_st.data ( type == CONTROL_TYPE) {
+typedef struct aodv_packet_st : ccc_packet_t.data ( type == CONTROL_TYPE) {
     u_char aodv_type;     ///< Type of the packet is always RFC_DATA_TYPE, leave blank, this is set internally.
     u_char data[];        ///< payload data
-};
+} aodv_packet_t;
 
 /** ROUTING packet */
-struct routing_packet_st : ccc_packet_st.data ( type == RFC_TYPE) {
+typedef struct routing_packet_st : ccc_packet_t.data ( type == RFC_TYPE) {
     u_char routing_type;   ///< Type of the packet is always RFC_DATA_TYPE, leave blank, this is set internally.
     u_char data[];         ///< payload data
-};
+} routing_packet_t;
 
 /**
  * Structure of an rfc  packet.
@@ -73,7 +73,7 @@ struct routing_packet_st : ccc_packet_st.data ( type == RFC_TYPE) {
  * \warning Check the MTU with rfc_get_mtu(). Since RFC does not yet support fragmenting 
  * packets, this MUST be done at application level.
  */
-struct rfc_packet_st : routing_packet_st.data ( routing_type == RFC_TYPE_DATA) {
+typedef struct rfc_packet_st : routing_packet_t.data ( routing_type == RFC_TYPE_DATA) {
   u_char port;    ///< Port that the packet is directed to. 
   u_short seqno;  ///< Sequence number of the RFC Packet. The sequence number uniquely identifies any data packet.
   u_short flags;  ///< Flags: A == Use Ack for this packet.
@@ -83,7 +83,7 @@ struct rfc_packet_st : routing_packet_st.data ( routing_type == RFC_TYPE_DATA) {
   u_char data[];  ///< The payload in bytes. Payload should be delivered in network byte order.
 } rfc_packet_t;
 
-struct rfc_ack_packet_st : routing_packet_st.data ( routing_type == RFC_TYPE_ACK) {
+typedef struct rfc_ack_packet_st : routing_packet_t.data ( routing_type == RFC_TYPE_ACK) {
   u_short originator;   // Originator, who first sent the packet which must be acknowledged.
   u_short seqno;        // Sequence number of the packet that must be acknowledged.
 } rfc_ack_packet_t;
@@ -92,7 +92,7 @@ struct rfc_ack_packet_st : routing_packet_st.data ( routing_type == RFC_TYPE_ACK
 /**
  * Structure of a RREQ packet
  */
-struct aodv_control_rreq_packet_st : aodv_packet_st.data ( aodv_type == RREQ_TYPE) {
+typedef struct aodv_control_rreq_packet_st : aodv_packet_t.data ( aodv_type == RREQ_TYPE) {
   u_char flags;                ///< Flags (5 bit) + reserved (3 bit).
   u_char hopcount;             ///< Number of hops that RREQ made.
   u_char reserved;             ///< Reserved, not present in original AODV.
@@ -107,7 +107,7 @@ struct aodv_control_rreq_packet_st : aodv_packet_st.data ( aodv_type == RREQ_TYP
 /**
  * Structure of a RREP packet
  */
-struct aodv_control_rrep_packet_st : aodv_packet_st.data ( aodv_type == RREP_TYPE) {
+typedef struct aodv_control_rrep_packet_st : aodv_packet_t.data ( aodv_type == RREP_TYPE) {
   u_char flags;                ///< Flags (2 bit) + reserved (6 bit).
   u_char prefix_sz;            ///< Reserved (3 bit) + Prefix SZ (5 bit).
   u_char hopcount;             ///< Number of hops that RREP made.
@@ -121,7 +121,7 @@ struct aodv_control_rrep_packet_st : aodv_packet_st.data ( aodv_type == RREP_TYP
 /**
  * Structure of an RERR packet
  */
-struct aodv_control_rerr_packet_st : aodv_packet_st.data ( aodv_type == RERR_TYPE) {
+typedef struct aodv_control_rerr_packet_st : aodv_packet_t.data ( aodv_type == RERR_TYPE) {
   u_short flags;                           ///< Flags (1 bit) + reserved (15 bit).
   u_char destcount;                        ///< Number of unreachable destiantions.
   u_short unreachable_destination_address; ///< Address of the unreachable destination (16 bit, not 32 bit as in rfc3561).
@@ -135,6 +135,6 @@ struct aodv_control_rerr_packet_st : aodv_packet_st.data ( aodv_type == RERR_TYP
 /**
  * Structure of an RREP-ACK packet
  */
-struct aodv_control_rrep_ack_packet_st : aodv_packet_st.data ( aodv_type == RREP_ACK_TYPE) {
+typedef struct aodv_control_rrep_ack_packet_st : aodv_packet_t.data ( aodv_type == RREP_ACK_TYPE) {
   u_char reserved;                 ///< Reserved (8 bit).
 } aodv_control_rrep_ack_packet_t;
