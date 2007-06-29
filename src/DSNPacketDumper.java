@@ -42,7 +42,11 @@ public class DSNPacketDumper {
 		// create and subscribe data sink
 		dsnPacketSource.subscribe( new AbstractSink<PacketTuple>() {
 			public void process(PacketTuple o, int srcID, long timestamp) {
-				System.out.println( "" + timestamp + " " + o.getDsnNode() + " " + o.toString());
+// HEX
+ 				System.out.println( "" + timestamp + " " + o.getDsnNode() + " " + o.toString());
+// PRETTY
+//				System.out.println( "" + timestamp + " " + o.getDsnNode() + " { \n" + o.toStringPretty() + "}\n");
+
 			}
 		}, 0);
 		

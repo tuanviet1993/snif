@@ -10,7 +10,7 @@ The avetana bt stack is fine for linux (even free) and mac os x.
 
 2. The complete BTnode Development Envrionment
 You need the CVS HEAD version of BTnut, BTnut Release 1.8 is not sufficient.
-It is available at http://www.btnode.ethz.ch
+It is available at sourceforge. follow the links and instrudtions on http://www.btnode.ethz.ch
 
 
 COMPILE
