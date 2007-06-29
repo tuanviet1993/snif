@@ -418,7 +418,7 @@ void main(void) {
     srand( node_addr );
 
 	// set sink state for node 234 and another one
-	if (node_addr == 0xea || node_addr == 0x185){
+	if (node_addr == 0xe0){
 		I_AM_SINK = 1;
 	}
 

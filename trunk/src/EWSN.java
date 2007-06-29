@@ -73,7 +73,7 @@ public class EWSN extends SNIFController {
 	private static int totalData;
 
 	// address of sink in observed network
-	final static int theSinkID = 0xb0; // 0xea;
+	final static int theSinkID = 0xe0; // 0xea;
 	final static NodeAddress theSink = new NodeAddress( theSinkID );
 
 	private static View view;
@@ -81,9 +81,8 @@ public class EWSN extends SNIFController {
 	private static PDL parser;
 
 	private int nodeList [] = {
-	144 , 160 , 177 , 180 , 236 ,
-	237 , 243 , 267 , 272 , 292 ,
-	288 , 313 , 340 , 382 , 387			
+	225,  235 , 255 , 295 , 297 ,
+	315 , 352 , 364 , 385 , 477 ,
     };
 
 	// W 
