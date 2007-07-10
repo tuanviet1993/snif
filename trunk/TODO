@@ -5,8 +5,11 @@ Code improvements
 - Provide generic interface to map tuples to metric info
 - TopologyAnalyzer code is not very efficient (re-write)
 
+Usage improvement
+- DSNConnector connects to the first found BTnode. If this one is not a sniffer,
+  it will try again instead of trying another node
+
 New Features
-- Set sniffer frequency based on config file (and test)
 - Packet Description Parser (PDL)
   - support hexadecimal numbers
   - support #define A 2
