@@ -35,4 +35,5 @@ send the sniffer configuration and will start forwarding overheared ChipCon CC10
 traffic to the host.
 
 NEWS
-- BTnut HEAD of 2007-07-10 adds support for tuning CC1000 to the specified frequency
+- BTnut HEAD of 2007-07-10 adds support for tuning CC1000 to the specified frequency and fixed support for fixed-size packets
+
