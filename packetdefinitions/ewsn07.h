@@ -1,5 +1,5 @@
 // Physical Layer
-cc.freq = 868300000;
+cc.freq = 868500000;
 cc.sop = 0x33;
 cc.baud = 19200;
 cc.crc = 0xF1F1;
