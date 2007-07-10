@@ -658,7 +658,7 @@ THREAD ( WORKER, arg){
 		
 		// configure MAC sniffer
 		if (snif_set_config){
-            prettyPrintConfig();
+            // prettyPrintConfig();
 			sniffer_config(&snif_config);
 			snif_set_config = 0;
 			NutEventPost( &snif_config_queue);
