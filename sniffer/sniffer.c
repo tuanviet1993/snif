@@ -596,16 +596,18 @@ THREAD ( SNIFFER, arg){
                 // check crc
                 packetCRC = packet->data[length-1] | (((u_short) packet->data[length-2]) << 8);
                 calcCRC = crc_ccitt_compute(&packet->data[0], length-2);
-                if (packetCRC != calcCRC) {
-                    result = -1;
-                }
-/*                if (packetCRC == calcCRC) {
+//                if (packetCRC != calcCRC) {
+//
+// disable CRC CHECK!
+//                    result = -1;
+//                }
+                if (packetCRC == calcCRC) {
                     printf("CRC ok! (%04x)", packetCRC);
                 } else {
                     printf("CRC WRONG! packet %04x, calc %04x\n", packetCRC, calcCRC);
                 }
                 print_hex_data( "PACKET (%u): ", (u_char *) &packet->data[0], length);
- */
+
             }
         } while (result != 0);
         // set bt addr
