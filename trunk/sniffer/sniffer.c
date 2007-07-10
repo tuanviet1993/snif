@@ -487,22 +487,6 @@ void broadcastConfig(void){
  *
  */
 
-#ifdef __BTNODE3__
-void setBMACConfig(void) {
-        ccSopLength = 1;
-        ccSopFirst = 0x33;
-        ccSopSecond = 0;                // (unused, as 1 byte sop)
-        ccFixedSize = 0;                // variable packet size
-        ccHeaderSize = 6;               // bmac header
-        ccPacketSize = 0;               // (unused, as fixed size)
-        ccLengthPos = 4;                // forth byte is len byte
-        ccLengthOffset = 0;            // there are always two bytes too much
-        ccCrcLength = 0;                // (unused, crc not checked)
-        ccCrcPoly = 0xffff;             // (unused, crc not checked)
-        ccCrcPos = 0;                   // (unused, crc not checked)
-}
-#endif
-
 void prettyPrintConfig(void) {
     // dump 
     print_hex_data( "SNIFFER: snif config received (%u): ", (u_char *) &snif_config, sizeof(struct sniffer_config) );
@@ -672,6 +656,7 @@ THREAD ( WORKER, arg){
 		
 		// configure MAC sniffer
 		if (snif_set_config){
+            prettyPrintConfig();
 			sniffer_config(&snif_config);
 			snif_set_config = 0;
 			NutEventPost( &snif_config_queue);

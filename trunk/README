@@ -34,3 +34,5 @@ If everything is ok, the application will connect to the first BTnode it finds,
 send the sniffer configuration and will start forwarding overheared ChipCon CC1000
 traffic to the host.
 
+NEWS
+- BTnut HEAD of 2007-07-10 adds support for tuning CC1000 to the specified frequency
