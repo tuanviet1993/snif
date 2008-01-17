@@ -120,6 +120,7 @@ public class DecodedPacket {
 
     	int dotPos = attribute.indexOf("."); 
     	int arrayPos = attribute.indexOf("[");
+    	int arrayPos2 = attribute.indexOf("]");
     	
     	String field = attribute;
     	String rest = "";
@@ -134,7 +135,7 @@ public class DecodedPacket {
     			arrayAccess = true;
     			structAccess = true;
         		field = attribute.substring(0, arrayPos);
-        		arrayIdx = attribute.substring( arrayPos+1, dotPos - 1);
+        		arrayIdx = attribute.substring( arrayPos+1, arrayPos2);
         		rest = attribute.substring( dotPos+1);
     		}
     	} else if ( dotPos >= 0) {
@@ -144,7 +145,7 @@ public class DecodedPacket {
     	} else if ( arrayPos >= 0) {
     		arrayAccess = true;
     		field = attribute.substring( 0,arrayPos);
-    		arrayIdx = attribute.substring( arrayPos+1);
+    		arrayIdx = attribute.substring( arrayPos+1, arrayPos2 );
     		rest = "";
     	}
     	
