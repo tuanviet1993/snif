@@ -160,6 +160,7 @@ public class DecodedPacket {
 		for (Object attObj : type.attributes) {
 			Attribute att = (Attribute) attObj;
 			if (att.name.equals(field)) {
+				// add offset for access element in array
 				if (arrayAccess) {
 					offset += Integer.parseInt( arrayIdx) * att.type.size;
 				}
@@ -179,9 +180,9 @@ public class DecodedPacket {
 					}
 					return getIntAttribute( (PacketTemplate) att.type, offset + att.offset, rest );
 				}
-				// check for single variable sized component
-				if (type.fixedLength == false && att.offset > type.lengthPos){
-					offset += getInt( rawData, offset + type.lengthPos, type.lengthField.type.size, TypeSpecifier.littleEndian);
+				// add offset of "the" array if accessing values behind
+				if (type.fixedLength == false && att.offset > type.lengthPos && att.elements > 0){
+					offset += getInt( rawData, offset + type.lengthPos, type.lengthField.type.size, TypeSpecifier.littleEndian) * type.lengthMultiply;
 				}
 		    	return getInt( rawData, offset + att.offset, att.type.size, TypeSpecifier.littleEndian);
 			}
@@ -284,30 +285,19 @@ public class DecodedPacket {
 	}
 	
 	public static void main (String args[]) {
-		Integer aInteger = 17;
-		Integer bInteger = 17;
+		PDL parser = Parser.readDescription("packetdefinitions/test.h");
+		parser.printTypes();
+		parser.printStructs();
+		parser.printPackets();
+		parser.printValues();
+
+		byte aData[] =  { 5, 0, 1,  0, 2,  0, 3, 0, 4,  0,5,  0, 6 };
+		DecodedPacket aPacket = DecodedPacket.createPacketFromBuffer(parser, aData);
+		for (int i=0;i<5;i++) {
+			System.out.println(aPacket.getIntAttribute("array["+i+"]"));
+		}
+		System.out.println(aPacket.getIntAttribute("crc"));
 		
-		byte aData[] =  { 1,2,3 };
-		byte bData[] =  { 1,2,3 };
-		String aString = "abcde";
-		String bString = "abcde";
-		
-		DecodedPacket aPacket = new DecodedPacket( aData, null);
-		DecodedPacket bPacket = new DecodedPacket( bData, null);
-		System.out.println(" aPacket == bPacket " + aPacket.equals( bPacket) );
-		DecodedPacket cPacket = new DecodedPacket( bPacket );
-		System.out.println(" b = c " + bPacket.equals( cPacket) );
-		System.out.println(" aData "+aData.hashCode() );
-		System.out.println(" bData "+bData.hashCode() );
-		System.out.println(" aData == bData "+aData.equals(bData) );
-		System.out.println(" aData "+aData );
-		System.out.println(" bData "+bData );
-		System.out.println(" aPacket "+aPacket.hashCode() );
-		System.out.println(" bPacket "+bPacket.hashCode() );
-		System.out.println(" aString "+aString.hashCode() );
-		System.out.println(" bString "+bString.hashCode() );
-		System.out.println(" aInteger "+aInteger.hashCode() );
-		System.out.println(" bInteger "+bInteger.hashCode() );
 	}
 
 	public PacketTemplate getTemplate() {

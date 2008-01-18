@@ -200,7 +200,8 @@ void MemberDeclaration (PacketTemplate packet) : { TypeSpecifier typeSpec; Token
 		       		throw new ParseException("Variable array size field '"+field+"' does not exist");
 				}	
 				packet.lengthPos = packet.lengthField.offset;
-				packet.lengthOffset = 0; 
+				packet.lengthOffset = 0;
+				packet.lengthMultiply = typeSpec.size;  
 				elementsInt = PacketTemplate.variableSizedDirect;
 			}	
 		} else if (integerLiteral != null){

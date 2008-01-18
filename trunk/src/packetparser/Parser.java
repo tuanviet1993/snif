@@ -256,6 +256,7 @@ public class Parser extends PDL implements ParserConstants {
                                 }
                                 packet.lengthPos = packet.lengthField.offset;
                                 packet.lengthOffset = 0;
+                                packet.lengthMultiply = typeSpec.size;
                                 elementsInt = PacketTemplate.variableSizedDirect;
                         }
                 } else if (integerLiteral != null){
@@ -580,13 +581,13 @@ public class Parser extends PDL implements ParserConstants {
     return false;
   }
 
-  static final private boolean jj_3R_4() {
-    if (jj_3R_8()) return true;
+  static final private boolean jj_3R_17() {
+    if (jj_scan_token(FLOAT)) return true;
     return false;
   }
 
-  static final private boolean jj_3R_17() {
-    if (jj_scan_token(FLOAT)) return true;
+  static final private boolean jj_3R_4() {
+    if (jj_3R_8()) return true;
     return false;
   }
 
@@ -600,13 +601,13 @@ public class Parser extends PDL implements ParserConstants {
     return false;
   }
 
-  static final private boolean jj_3R_5() {
-    if (jj_3R_8()) return true;
+  static final private boolean jj_3R_14() {
+    if (jj_scan_token(SHORT)) return true;
     return false;
   }
 
-  static final private boolean jj_3R_14() {
-    if (jj_scan_token(SHORT)) return true;
+  static final private boolean jj_3R_5() {
+    if (jj_3R_8()) return true;
     return false;
   }
 

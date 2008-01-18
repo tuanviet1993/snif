@@ -32,22 +32,11 @@ public class TypeSpecifier {
 		buffer.append(" " + typeName );
 		if (elements > 1){
 			buffer.append("[" + elements + "]");
+		} else if (elements < 1) {
+			buffer.append("[" + "VARSIZE"+"]");
 		}
 		buffer.append( "; // littleEndian = " + littleEndian);
 		return buffer.toString();		
-	}
-	
-	public String toString2(){
-		StringBuffer buffer = new StringBuffer();
-		if (signed == false)
-			buffer.append("u");
-		buffer.append("int"+ 8*size);
-		buffer.append("_t ");
-		buffer.append(typeName);
-		if (elements > 1){
-			buffer.append("[" + elements + "]");
-		}
-		return buffer.toString();
 	}
 	
 	public static void setEndianess(boolean littleEndian ) {
