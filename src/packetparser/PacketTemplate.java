@@ -74,6 +74,9 @@ public class PacketTemplate extends TypeSpecifier {
 
 	int lengthOffset = 0;
 
+	/** TODO hack to support variable sized arrays which are NOT of a single byte type */
+	int lengthMultiply = 1;
+	
 	int getSize() {
 		return packetSize;
 	}
