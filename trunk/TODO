@@ -27,3 +27,4 @@ New Operators:
 
 Bugs:
 - CRC in pretty print wrong
+- only one variable size array is supported per struct
