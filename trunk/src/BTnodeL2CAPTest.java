@@ -8,8 +8,7 @@ import javax.bluetooth.LocalDevice;
 import javax.bluetooth.RemoteDevice;
 import javax.bluetooth.ServiceRecord;
 
-import de.avetana.bluetooth.connection.Connector;
-
+import javax.microedition.io.Connector;
 
 public class BTnodeL2CAPTest extends Thread implements DiscoveryListener {
 	private L2CAPConnection con;
