@@ -99,6 +99,7 @@ public class DSNConnector extends Thread implements DiscoveryListener {
 	 */
 	public void connect(String bt_mac_address) {
 		stopConnection = false;
+		snifGateway = bt_mac_address;
 		while (!stopConnection) {
 			// try to connect
 	    	writeMessage("Connecting to DSN via BTnode " + snifGateway);
@@ -108,8 +109,7 @@ public class DSNConnector extends Thread implements DiscoveryListener {
 		    	writeMessage("Connected to DSN via BTnode " + snifGateway);
 		    	return;
 			} catch (IOException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
+		    	writeMessage("Retry...");
 			}
 		}
 	}
