@@ -93,6 +93,30 @@ public class DSNConnector extends Thread implements DiscoveryListener {
 
 	}
 	
+	/** 
+	 * 
+	 * @param bt_mac_address
+	 */
+	public void connect(String bt_mac_address) {
+		stopConnection = false;
+		while (!stopConnection) {
+			// try to connect
+	    	writeMessage("Connecting to DSN via BTnode " + snifGateway);
+	    	try {
+				con = (L2CAPConnection) Connector.open("btl2cap://" + snifGateway + ":1011");
+		    	// connected !!!
+		    	writeMessage("Connected to DSN via BTnode " + snifGateway);
+		    	return;
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+		}
+	}
+	
+	/**
+	 * 
+	 */
 	public void connect() {
 		stopConnection = false;
 		while (!stopConnection) {
