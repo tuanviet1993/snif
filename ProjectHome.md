@@ -1,0 +1,1 @@
+SNIF is a Sensor Network Inspection Framework that supports passive observation and inspection of deployed Wireless Sensor Networks (WSN). It consists of a distributed sniffer, a new package description language, and a data stream engine with multiple operators.
